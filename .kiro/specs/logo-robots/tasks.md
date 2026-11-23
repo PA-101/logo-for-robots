@@ -6,7 +6,7 @@ Build in this order. Each task is small, ends with a passing `node --test tests/
 
 - [x] 2. **Parser (`lang.js`).** Tokenizer with line numbers, recursive-descent parser, limits, friendly error messages, "did you mean" suggestion, command count with saturation. _Requirements: 1.2 to 1.12_
 
-- [ ] 3. **Parser unit tests.** Every command; nested repeat; multi-line blocks; comments; case-insensitivity; each error message and its line number; every limit at the boundary and one past it; empty and comment-only input. _Requirements: 1.2 to 1.12_
+- [x] 3. **Parser unit tests.** Every command; nested repeat; multi-line blocks; comments; case-insensitivity; each error message and its line number; every limit at the boundary and one past it; empty and comment-only input. _Requirements: 1.2 to 1.12_
 
 - [ ] 4. **Parser property tests.** (a) `parse` never throws on random strings, random token soups, and mutated valid programs (characters deleted, inserted, swapped); (b) result shape is always valid (`ok` matches `errors.length === 0`; every error has a line number of at least 0 and a message); (c) generated valid programs always parse and `countCommands` matches an independent count; (d) parse is deterministic. _Requirements: 1.10, 1.11_
 

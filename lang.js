@@ -204,7 +204,7 @@
   }
 
   // Number of commands the robot would execute once repeats are expanded.
-  // Every node costs 1; a repeat costs 1 + n * (cost of its body). Saturates at 1e9.
+  // Every node costs 1; a repeat costs 1 + n * max(1, cost of its body). Saturates at 1e9.
   function countNodes(nodes) {
     var total = 0;
     for (var i = 0; i < nodes.length; i++) total = Math.min(SATURATE, total + countNode(nodes[i]));
@@ -212,7 +212,8 @@
   }
 
   function countNode(node) {
-    if (node.type === 'repeat') return Math.min(SATURATE, 1 + node.n * countNodes(node.body));
+    // Each loop pass costs at least 1, so nested empty loops cannot hide a huge amount of work.
+    if (node.type === 'repeat') return Math.min(SATURATE, 1 + node.n * Math.max(1, countNodes(node.body)));
     if (node.type === 'if') return Math.min(SATURATE, 1 + countNodes(node.body));
     return 1;
   }
