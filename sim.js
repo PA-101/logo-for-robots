@@ -32,6 +32,8 @@
     TURN_DUTY: 0.6,
     BRAKE_TAU: 0.13,          // s
     TURN_BRAKE_TAU: 0.10,     // s
+    TURN_SLOW_ZONE: 0.8,      // rad, turns slow down when this close to the target
+    TURN_SLOW_DUTY: 0.3,
     STALL_SPEED: 0.02,        // m/s
     STALL_TIME: 0.5,          // s
     SAMPLE_EVERY: 6           // steps per telemetry sample (10 Hz)
@@ -213,7 +215,8 @@
         rem = cmd.target - cmd.done;
         if (!cmd.braking && rem <= C.TURN_BRAKE_TAU * Math.abs(state.w) + 0.01) cmd.braking = true;
         if (cmd.braking) return settled ? null : [0, 0];
-        return [-cmd.d * C.TURN_DUTY, cmd.d * C.TURN_DUTY];
+        var td = rem < C.TURN_SLOW_ZONE ? C.TURN_SLOW_DUTY : C.TURN_DUTY;
+        return [-cmd.d * td, cmd.d * td];
       }
       cmd.left -= C.DT;
       return cmd.left <= 0 ? null : [0, 0];
@@ -276,7 +279,6 @@
       var Fg = [0, 0];
       for (i = 0; i < 2; i++) {
         var wasSlipping = slipOn[i];
-        var rel = wheel[i] * C.WHEEL_R - vGround[i];
         if (!wasSlipping && Math.abs(F[i]) <= Flim) {
           Fg[i] = F[i];
           continue;
@@ -293,12 +295,14 @@
             });
           }
         }
-        var s = sign(rel) || sign(F[i]);
+        // While slipping, the ground pushes with the friction limit in the motor's direction.
+        // The wheel spins ahead of the ground, but cannot fall behind it in the drive direction.
+        var s = sign(F[i]);
         Fg[i] = Flim * s;
         var wNew = wheel[i] + DT * (tau[i] - C.WHEEL_R * Fg[i]) / C.J_WHEEL;
-        var relNew = wNew * C.WHEEL_R - vGround[i];
-        if (wasSlipping && Math.abs(F[i]) <= Flim &&
-            (rel * relNew <= 0 || Math.abs(relNew) < C.SLIP_REGRIP_SPEED)) {
+        var spin = s * (wNew * C.WHEEL_R - vGround[i]);
+        if (spin < 0) { wNew = vGround[i] / C.WHEEL_R; spin = 0; }
+        if (Math.abs(F[i]) <= Flim && spin < C.SLIP_REGRIP_SPEED) {
           slipOn[i] = false;
           slipEnd[i] = state.t;
           wheel[i] = vGround[i] / C.WHEEL_R;
@@ -307,8 +311,7 @@
           wheel[i] = wNew;
           if (slipEv[i]) slipEv[i].peak = Math.max(slipEv[i].peak, Math.abs(F[i]));
         }
-      }
-      state.wL = wheel[0];
+      }      state.wL = wheel[0];
       state.wR = wheel[1];
       state.slipL = slipOn[0];
       state.slipR = slipOn[1];
