@@ -4,7 +4,7 @@ Build in this order. Each task is small, ends with a passing `node --test tests/
 
 - [x] 1. **Scaffold and test harness.** Create `index.html` (empty panels, script tags in order), `style.css` (theme variables only), empty module files with the export pattern, `tests/helpers.js` (seeded PRNG, random-string generator) and a smoke test that requires every module. Check that `index.html` opens by double-click. _Requirements: 7.1, 7.2, 7.3_
 
-- [ ] 2. **Parser (`lang.js`).** Tokenizer with line numbers, recursive-descent parser, limits, friendly error messages, "did you mean" suggestion, command count with saturation. _Requirements: 1.2 to 1.12_
+- [x] 2. **Parser (`lang.js`).** Tokenizer with line numbers, recursive-descent parser, limits, friendly error messages, "did you mean" suggestion, command count with saturation. _Requirements: 1.2 to 1.12_
 
 - [ ] 3. **Parser unit tests.** Every command; nested repeat; multi-line blocks; comments; case-insensitivity; each error message and its line number; every limit at the boundary and one past it; empty and comment-only input. _Requirements: 1.2 to 1.12_
 
