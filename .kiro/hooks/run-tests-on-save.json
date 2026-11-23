@@ -1,0 +1,1 @@
+{"version":"v1","hooks":[{"name":"Run tests on save","trigger":"PostFileSave","action":{"type":"command","command":"node --test tests/"},"matcher":"\\.js$","enabled":true}]}
