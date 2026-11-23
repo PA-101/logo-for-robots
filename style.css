@@ -1,0 +1,38 @@
+:root {
+  --bg: #050805;
+  --panel: #0a110a;
+  --fg: #33ff66;
+  --dim: #1a7a33;
+  --warn: #ffb000;
+  --fail: #ff3b30;
+  --font: "Cascadia Mono", Consolas, "Courier New", monospace;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 16px;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+h1, h2 { margin: 0 0 8px; font-weight: normal; }
+h1 { font-size: 24px; }
+h2 { font-size: 16px; color: var(--dim); }
+.tagline { margin: 0 0 16px; color: var(--dim); }
+
+main {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr 1fr;
+  gap: 16px;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--dim);
+  padding: 12px;
+}

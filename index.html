@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Logo for Robots</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>LOGO FOR ROBOTS</h1>
+    <p class="tagline">Program a turtle. Meet the real robot.</p>
+  </header>
+
+  <main>
+    <section id="editor-panel" class="panel" aria-label="Program">
+      <h2>PROGRAM</h2>
+      <div id="editor-area"></div>
+      <div id="controls"></div>
+      <div id="messages" role="status"></div>
+    </section>
+
+    <section id="arena-panel" class="panel" aria-label="Arena">
+      <h2>ARENA</h2>
+      <div id="arena-area"></div>
+    </section>
+
+    <section id="info-panel" class="panel" aria-label="Telemetry and explanation">
+      <h2>TELEMETRY</h2>
+      <div id="telemetry-area"></div>
+      <h2>WHY DID IT FAIL?</h2>
+      <div id="why-area"></div>
+    </section>
+  </main>
+
+  <script src="lang.js"></script>
+  <script src="levels.js"></script>
+  <script src="sim.js"></script>
+  <script src="telemetry.js"></script>
+  <script src="explain.js"></script>
+  <script src="ui.js"></script>
+</body>
+</html>
