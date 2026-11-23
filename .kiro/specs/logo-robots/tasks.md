@@ -12,7 +12,7 @@ Build in this order. Each task is small, ends with a passing `node --test tests/
 
 - [x] 5. **Physics core (`sim.js`, part 1).** Constants, battery (`Voc`, sag, charge), motor model, ground contact with slip, body integration, with duties set directly (no program yet). `createSim` accepts a test-only duty override. _Requirements: 2.1, 2.3 to 2.9, 2.13_
 
-- [ ] 6. **World and interpreter (`sim.js`, part 2) and `levels.js`.** Wall collisions, sensor ray, stall detection, event log, interpreter (move, turn, wait, repeat, if), goal, timeout, result. `levels.js` with `buildLevel`, the 3 levels and reference programs. _Requirements: 1.2 to 1.8, 2.10 to 2.12, 3.1 to 3.5_
+- [x] 6. **World and interpreter (`sim.js`, part 2) and `levels.js`.** Wall collisions, sensor ray, stall detection, event log, interpreter (move, turn, wait, repeat, if), goal, timeout, result. `levels.js` with `buildLevel`, the 3 levels and reference programs. _Requirements: 1.2 to 1.8, 2.10 to 2.12, 3.1 to 3.5_
 
 - [ ] 7. **Physics and level unit tests.** Stall current equals `Vt / MOTOR_R`; torque is zero at no-load speed and falls linearly; voltage sag under load; battery flat ends the run; slip starts above `F_lim` and not below; slick floor slips where normal floor does not; wall stops the robot; stall event after 0.5 s; sensor distances in a known map; `wall-ahead` branch taken and skipped; each reference program passes its level; a program that drives into a wall fails with a `stall` event; an empty-battery case ends with `battery_flat`; `timeout` event. _Requirements: 2.4 to 2.12, 3.1 to 3.7_
 
