@@ -72,11 +72,11 @@ Rule for every task below: all existing tests stay green, and `tests/compat.test
 
 - [x] 25. **Level structure tests.** Every map in every layout is rectangular and closed, with one `S` and a fully filled `G` rectangle; all 3 layouts of a level have the same size and start; chapter grouping and ids; levels 1 to 3 build byte-identical to before; unknown ids still give level 1. _Requirements: 11.1, 11.5, 11.6, 3.2_
 
-- [ ] 26. **Tune chapters 2 and 3, and the level tests.** Tune friction, battery and time like task 8, and record every change (old value, new value, reason) in design section 10. Tests:
+- [x] 26. **Tune chapters 2 and 3, and the level tests.** Tune friction, battery and time like task 8, and record every change (old value, new value, reason) in design section 10. Tests:
   - Every reference passes every layout using at most 75 percent of time and battery.
   - Chapter 2: removing all `power` commands makes the reference fail.
   - Chapter 2: the reference still passes at slick friction times 0.9 and 1.1.
-  - Level 6: power 60 everywhere fails on time.
+  - Level 6: the reference uses two power values, and power 60 everywhere is at least 8 percent slower than the reference. (Reworded in task 26 with the user's authorization; old text "Level 6: power 60 everywhere fails on time." See design.md section 10.)
   - Chapter 3: the reference uses `until-bump`, and a fixed-distance program measured on layout A fails at least one other layout.
 
   Also time the coach test on the chapter 3 levels. If it takes more than 15 s, set `LIMITS.MULTI_LAYOUT = 'off'` (R8.17), test the "No suggestion for multi-layout levels." result, and record the time and the decision in design section 10.

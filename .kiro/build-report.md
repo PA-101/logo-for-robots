@@ -12,3 +12,14 @@ Running log of the autonomous build. One entry per task: what was done, test cou
 - Bug found by a new test: my own "no 'again'" check matched "against"; fixed to whole words.
 - Tests: 259 pass.
 - Looks off: the pass line appears twice (status line under the arena and the RESULT banner). Kept, because the status line is the arena's own status.
+
+## Part 2: task 26 (tuning chapters 2 and 3)
+
+- Level 4: battery 2.5 to 3.5 C, time 40 to 44 s. At friction x0.9 the reference now uses 64% of the time and 51% of the battery. Full power runs flat at x0.9, x1.0 and x1.1.
+- Level 6, first attempt as instructed: lower ice friction 0.04, 0.05 and 0.06 on the existing map. Every result was identical to 0.08 (full power passes in 17.1 s), because the robot speeds up and brakes on dry floor and needs no grip on the straight ice leg.
+- Level 6, fallback as instructed: redesigned with long ice legs after icy turns (18 x 10 map, battery 1.8 C, time 46 s). Full power runs flat at all three frictions; the reference passes with 67% battery and 69% time; power 60 everywhere is about 10% slower.
+- Authorized test change (level 6 only): "power 60 everywhere fails on time" became "two power values, and power 60 everywhere is at least 8% slower". Old text, new text and reason are in design.md section 10.
+- Level 9: battery 3 to 3.5 C (layout C used 74.7%).
+- Chapter 3 checks: references use until-bump; a fixed-distance program from layout A passes A and fails B and C on all three levels. Coach timing on chapter 3: about 2.7 s for 6 searches, so MULTI_LAYOUT stays "search".
+- Tests: 265 pass.
+- Looks off: level 4's charge use jumps with battery size (75% at 2.9 C, 51% at 3.0 C), so its tuning is sensitive. Chapter 3 time limits are loose (references use 19 to 52%).

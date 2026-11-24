@@ -200,11 +200,11 @@ Starting values below are not tuned yet. Task 26 tunes them like task 8 and reco
 
 | id | Name | Map (rows top to bottom) | Ice mu | Battery | Time | Reference |
 |---|---|---|---|---|---|---|
-| 4 | Ice Hairpin | `############` / `#Sooooooooo#` / `##########o#` / `#Gooooooooo#` / `############` | 0.08 | 2.5 C | 40 s | `power 70` `forward 450` `right 90` `forward 100` `right 90` `forward 450` |
+| 4 | Ice Hairpin | `############` / `#Sooooooooo#` / `##########o#` / `#Gooooooooo#` / `############` | 0.08 | 3.5 C | 44 s | `power 70` `forward 450` `right 90` `forward 100` `right 90` `forward 450` |
 | 5 | Frozen Switchback | `#############` / `#Soooooooooo#` / `###########o#` / `#ooooooooooo#` / `#o###########` / `#ooooooooooG#` / `#############` | 0.08 | 4 C | 75 s | `power 70` `forward 500` `right 90` `forward 100` `right 90` `forward 500` `left 90` `forward 100` `left 90` `forward 500` |
-| 6 | Black Ice | `##############` / `#S.....#######` / then 6 rows of `######o#######` / `######......G#` / `##############` | 0.08 | 3 C | 30 s | `forward 250` `right 90` `power 60` `forward 350` `power 100` `left 90` `forward 300` |
+| 6 | Black Ice | `##################` / `#S..o#############` / then 6 rows of `####o#############` / `####ooooooooo...G#` / `##################` | 0.08 | 1.8 C | 46 s | `forward 150` `power 60` `right 90` `forward 350` `left 90` `forward 400` `power 100` `forward 200` |
 
-Level 6 mixes normal floor and ice. It is meant to need power changes in the middle of the program: full power everywhere crashes on the ice, and low power everywhere runs out of time. Task 26 checks both.
+Level 6 mixes normal floor and ice: a short dry start, an icy corner, two long ice legs (7 and 8 cells) and a dry finish. Full power everywhere runs the battery flat on the ice; the reference lowers power for the ice and raises it for the dry finish, which beats power 60 everywhere by about 10 percent in time. (Redesigned in task 26; see section 10.)
 
 **Chapter 3: Bumpers.** Each level has layouts A, B and C with the same size, start and heading (east). A run passes only if all three pass.
 
@@ -212,7 +212,7 @@ Level 6 mixes normal floor and ice. It is meant to need power changes in the mid
 |---|---|---|---|---|---|
 | 7 | Dark Corridor | corridor of 3, 5 or 7 cells, goal in the cell below its end | 3 C | 20 s | `until-bump` `back 15` `right 90` `forward 50` |
 | 8 | Long Hall | east leg 4, 6 or 3 cells, then south leg 2, 3 or 4 cells, goal east of the bottom | 3 C | 35 s | `until-bump` `back 15` `right 90` `until-bump` `back 15` `left 90` `forward 50` |
-| 9 | Find the Door | corridor of 8 cells; the door in its south wall is at column 3, 5 or 8; a room below with a goal row along its floor | 3 C | 45 s | `right 90` `repeat 8 [ if wall-ahead [ left 90 forward 50 right 90 ] ]` `until-bump` |
+| 9 | Find the Door | corridor of 8 cells; the door in its south wall is at column 3, 5 or 8; a room below with a goal row along its floor | 3.5 C | 45 s | `right 90` `repeat 8 [ if wall-ahead [ left 90 forward 50 right 90 ] ]` `until-bump` |
 
 `back 15` works because the bumper stops the robot with its centre `BODY_R` (0.10 m) from the wall, and the last cell's centre is 0.25 m from the wall.
 
@@ -308,6 +308,22 @@ Known physical limits of the model:
 - `J_WHEEL` (0.0005 kg m^2) is about 20 times the inertia of a real 3 cm wheel. It is kept because a realistic value gives a wheel time constant (about 0.004 s) shorter than the 1/60 s step, which makes the explicit integration unstable. As a result, a slipping wheel spins up slowly and only runs a few cm/s ahead of the ground. Slip mainly shows up as acceleration limited by friction, not as a visibly spinning wheel.
 - Ignoring wheel inertia while gripping means the slip threshold is a little lower than a real robot's.
 - At the original slick friction (0.25), slip barely changes outcomes, because braking from cruise needs about the same distance with or without slip (0.079 m planned, 0.076 m friction-limited). That is why chapter 2 uses ice (about 0.08) and long legs after turns. Task 26 adds its tuning rows here.
+
+### Task 26 tuning (chapters 2 and 3)
+
+| Item | Old | New | Reason |
+|---|---|---|---|
+| Level 4 battery | 2.5 C | 3.5 C | At friction x0.9 the reference used 71% of 2.5 C. Charge used is not smooth in capacity (75% at 2.9 C, 51% at 3.0 C, because a fuller battery keeps a higher voltage and the robot slips more), so 3.5 C was picked from the middle of the stable range 3.0 to 4.0 C. Measured at x0.9: 51% of the battery; full power still runs flat at x0.9, x1.0 and x1.1. |
+| Level 4 time limit | 40 s | 44 s | At x0.9 the reference took 72% of 40 s; now 64%. |
+| Level 6 map | straight 6-cell ice leg between dry corners (14 x 10) | dry start, icy corner, 7 ice cells south, icy corner, 8 ice cells east, dry finish (18 x 10) | On the old map ice friction had no effect at all: the robot accelerated and braked on dry floor and needed no grip on the ice. At ice friction 0.04, 0.05, 0.06 and 0.08 full power passed in 17.1 s (faster than the reference). A search of 54 passing shapes found this one. |
+| Level 6 battery | 3 C | 1.8 C | Full power uses about 1.7 to 1.9 C on the new map, the reference about 1.2 C. 1.8 C runs full power flat at x0.9, x1.0 and x1.1 and leaves the reference 33% spare. |
+| Level 6 time limit | 30 s | 46 s | The new map is longer. The reference takes 69% of 46 s at x0.9. |
+| Level 6 reference | `forward 250` `right 90` `power 60` `forward 350` `power 100` `left 90` `forward 300` | `forward 150` `power 60` `right 90` `forward 350` `left 90` `forward 400` `power 100` `forward 200` | Matches the new map. |
+| Level 9 battery | 3 C | 3.5 C | The reference used 74.7% on layout C, too close to the 75% limit. |
+| Task 26 test text for level 6 (authorized change) | "Level 6: power 60 everywhere fails on time." | "Level 6: the reference uses two power values, and power 60 everywhere is at least 8 percent slower than the reference." | Authorized by the user for level 6 only. No measured level 6 shape (410 before, 54 passing now) let full power fail and power 60 everywhere time out while keeping the 75% margin. |
+| `LIMITS.MULTI_LAYOUT` (R8.17) | search | search (kept) | The chapter 3 coach test (6 searches over 3 layouts) took about 2.7 s, under the 15 s limit. |
+
+Chapter 3 limits are loose: references use 19 to 52 percent of the time limit. They pass the 75 percent rule, so they were not tightened.
 
 ## 11. Auto-Fix Coach (`coach.js`)
 

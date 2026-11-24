@@ -73,8 +73,8 @@
         '#Gooooooooo#',
         '############'
       ],
-      capacity: 2.5,
-      timeLimit: 40,
+      capacity: 3.5,
+      timeLimit: 44,
       slickMu: 0.08,
       powerMatters: true,
       reference: 'power 70\nforward 450\nright 90\nforward 100\nright 90\nforward 450'
@@ -101,24 +101,24 @@
     {
       id: 6,
       name: 'Black Ice',
-      hint: 'Normal floor, then ice, then normal floor. Change power on the way.',
+      hint: 'A short dry start, two long icy legs, then dry floor again. Lower power for the ice and raise it after.',
       map: [
-        '##############',
-        '#S.....#######',
-        '######o#######',
-        '######o#######',
-        '######o#######',
-        '######o#######',
-        '######o#######',
-        '######o#######',
-        '######......G#',
-        '##############'
+        '##################',
+        '#S..o#############',
+        '####o#############',
+        '####o#############',
+        '####o#############',
+        '####o#############',
+        '####o#############',
+        '####o#############',
+        '####ooooooooo...G#',
+        '##################'
       ],
-      capacity: 3,
-      timeLimit: 30,
+      capacity: 1.8,
+      timeLimit: 46,
       slickMu: 0.08,
       powerMatters: true,
-      reference: 'forward 250\nright 90\npower 60\nforward 350\npower 100\nleft 90\nforward 300'
+      reference: 'forward 150\npower 60\nright 90\nforward 350\nleft 90\nforward 400\npower 100\nforward 200'
     }
   ];
 
@@ -168,7 +168,7 @@
         { name: 'B', map: doorRoom('#####.####') },
         { name: 'C', map: doorRoom('########.#') }
       ],
-      capacity: 3,
+      capacity: 3.5,
       timeLimit: 45,
       reference: 'right 90\nrepeat 8 [ if wall-ahead [ left 90 forward 50 right 90 ] ]\nuntil-bump'
     }
