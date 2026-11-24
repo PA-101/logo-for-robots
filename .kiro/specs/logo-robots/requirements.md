@@ -75,4 +75,24 @@ Glossary: "program" is the text in the editor. "Step" is one 1/60 s simulation t
 
 7.1 The system shall run by opening `index.html` directly from disk in a current desktop browser, with no server, build step or network access.
 7.2 The system shall use no external audio or image files.
-7.3 The simulation, parser and explain modules shall not access the DOM.
+7.3 The simulation, parser, explain and coach modules shall not access the DOM.
+
+## R8. Auto-Fix Coach
+
+The coach is a search: it tries small changes to the numbers in the student's program and simulates each one. It is not a language model and is never described as AI.
+
+8.1 When the user asks for a fix after a failed run, the system shall search for a small edit to the current program that makes it pass the current level.
+8.2 The system shall generate candidate edits of exactly three kinds: scaling a `forward` or `back` distance by 0.5, 0.75, 0.9, 1.1, 1.25, 1.5 or 2; changing a `left` or `right` angle by plus or minus 5, 10, 15, 20, 30 or 45 degrees; and inserting `wait 0.5` or `wait 1` before a `left` or `right`.
+8.3 The system shall try every single edit first. Only if no single edit passes shall it try pairs of edits on two different commands, smallest combined change first. A candidate shall have at most 2 edits.
+8.4 The system shall simulate each candidate with `runToEnd` on the current level and shall simulate at most 3000 candidates per request.
+8.5 When more than one candidate passes, the system shall choose the one with the fewest edits, then the smallest change, then the shortest finish time, then the least charge used.
+8.6 When the same level and program are given, the system shall return an identical result, whether the search runs in one call or is spread over many frames.
+8.7 When a passing candidate is found, the system shall return `found: true`, the edited program text, the list of edits with line numbers, and an explanation that compares the original and the edited run using real numbers from their events (for example the stall duration and current before, the finish time and charge used after).
+8.8 If no candidate passes, then the system shall return `found: false`, the number of candidates tried, the closest attempt's distance to the goal, and a plain message saying the program probably needs a different command rather than a different number.
+8.9 If the program has a parse error, then the system shall return `found: false` and point to the error line instead of searching.
+8.10 If the program already passes, then the system shall return `found: false` with a message saying there is nothing to fix.
+8.11 An edit shall change only the number it targets (or insert one `wait`), keep every comment, line break and other character of the program, and keep every value within the language limits of R1.10.
+8.12 The system shall not use the level's reference program while searching.
+8.13 When the search receives any input (any level, any text), the system shall return a result and shall not throw.
+8.14 When the user presses "SUGGEST A FIX" after a failed run, the system shall show search progress, keep the page responsive, and then show the edits and the explanation in the "Why did it fail?" panel. When the user presses "APPLY FIX", the system shall put the edited program in the editor without running it. Reset cancels a search in progress.
+8.15 No text in the app or its documentation shall describe the coach as AI, a language model or machine learning.

@@ -12,11 +12,12 @@ levels.js       level definitions + builder (no DOM)
 sim.js          physics + interpreter       (no DOM)
 telemetry.js    sample recorder + graph scaling (no DOM)
 explain.js      failure explanation         (no DOM)
+coach.js        Auto-Fix Coach search       (no DOM)
 ui.js           editor, controls, canvas drawing, main loop (only DOM user)
 tests/          helpers.js, *.test.js (node --test tests/)
 ```
 
-Script order in `index.html`: `lang.js`, `levels.js`, `sim.js`, `telemetry.js`, `explain.js`, `ui.js`. Each logic file ends with `if (typeof module !== 'undefined') module.exports = {...}` and otherwise attaches to `window.LFR.<name>` (see steering/tech.md). Under Node, files load each other with `require`.
+Script order in `index.html`: `lang.js`, `levels.js`, `sim.js`, `telemetry.js`, `explain.js`, `coach.js`, `ui.js`. Each logic file ends with `if (typeof module !== 'undefined') module.exports = {...}` and otherwise attaches to `window.LFR.<name>` (see steering/tech.md). Under Node, files load each other with `require`.
 
 ## 2. Units and coordinates
 - SI units in the simulation: meters, seconds, kilograms, newtons, amperes, volts, coulombs, radians.
@@ -163,7 +164,7 @@ Level 3 turns on slick floor, so required wheel force exceeds the friction limit
 ## 8. Module interfaces
 
 ### lang.js
-- `parse(text) -> { ok, program, errors }`. `program` is an array of nodes: `{type:'forward'|'back'|'left'|'right'|'wait', n, line}`, `{type:'repeat', n, body, line}`, `{type:'if', cond:'wall-ahead', body, line}`. `errors` is an array of `{line, message}` (at most 5). Never throws.
+- `parse(text, options) -> { ok, program, errors }`. With `options.positions === true`, every command node also gets `start` (character offset of its keyword) and, for nodes with a number, `numStart` and `numEnd` (offsets of the number token, end exclusive). Without the option the node shape is unchanged. The coach uses these offsets to edit the source text in place. `program` is an array of nodes: `{type:'forward'|'back'|'left'|'right'|'wait', n, line}`, `{type:'repeat', n, body, line}`, `{type:'if', cond:'wall-ahead', body, line}`. `errors` is an array of `{line, message}` (at most 5). Never throws.
 - `LIMITS`, `countCommands(program)`.
 
 ### sim.js
@@ -196,6 +197,9 @@ Level 3 turns on slick floor, so required wheel force exceeds the friction limit
 - `explain(snapshot) -> { verdict:'PASS'|'FAIL', title, causes:[{type, t, text, root}], summary }`, where `snapshot = {result, events, state, level}`. Text is built from event fields only. Rule order: earliest event first; the earliest cause is marked `root: true`. Example text: `The robot stalled against a wall for 1.2 s, drawing 0.74 A. A stalled motor draws its maximum current and wastes battery.`
 - If there are no cause events and the result is fail: `The program finished 0.62 m short of the goal.`
 
+### coach.js
+See section 11. Exports `coach`, `createSearch`, `generateEdits`, `applyEdits`, `LIMITS` (`CANDIDATE_CAP`, `SCALE_FACTORS`, `TURN_DELTAS`, `WAITS`, `MAX_EDITS`).
+
 ### ui.js
 - Wires DOM to the modules. Holds `{level, sim, tel, speed}`. `requestAnimationFrame` loop with an accumulator: `steps = floor(acc / DT)` where `acc += frameSeconds * speed` (cap 0.25 s per frame so a hidden tab does not spiral). Drawing never changes simulation state.
 - Draws: arena (walls, slick cells, goal, robot, sensor ray) on one canvas; telemetry graph on another canvas using margins reserved for axes and legend; panel text as DOM text, not canvas.
@@ -227,3 +231,65 @@ Known physical limits of the model:
 - Cruising draws about 0.03 A in total, while both motors stalled against a wall draw about 0.84 A, so the battery drains about 25 times faster against a wall than while cruising. Cruise current is low because there is little drag and no rolling resistance.
 - `J_WHEEL` (0.0005 kg m^2) is about 20 times the inertia of a real 3 cm wheel. It is kept because a realistic value gives a wheel time constant (about 0.004 s) shorter than the 1/60 s step, which makes the explicit integration unstable. As a result, a slipping wheel spins up slowly and only runs a few cm/s ahead of the ground. Slip mainly shows up as acceleration limited by friction, not as a visibly spinning wheel.
 - Ignoring wheel inertia while gripping means the slip threshold is a little lower than a real robot's.
+
+## 11. Auto-Fix Coach (`coach.js`)
+
+The coach is a deterministic search over small numeric edits. It runs the real simulation on each candidate and keeps the best one that passes. It has no learned model, no randomness and no network access. It never reads `level.reference`.
+
+### Constants (`LIMITS`)
+
+| Name | Value | Meaning |
+|---|---|---|
+| `CANDIDATE_CAP` | 3000 | most candidates simulated per request |
+| `MAX_EDITS` | 2 | most edits in one candidate |
+| `SCALE_FACTORS` | 0.5, 0.75, 0.9, 1.1, 1.25, 1.5, 2 | for `forward` and `back` |
+| `TURN_DELTAS` | -5, 5, -10, 10, -15, 15, -20, 20, -30, 30, -45, 45 degrees | for `left` and `right` |
+| `WAITS` | 0.5, 1 s | inserted before `left` and `right` |
+
+### Edits
+
+An edit is `{ line, kind, start, end, insert, before, after, size, text }`. It replaces the characters `start..end` of the program text with `insert` (for a wait, `start === end`, so nothing is removed).
+
+`generateEdits(text)` parses with `{ positions: true }` and walks the command nodes in source order (including nodes inside `repeat` and `if` bodies). For each node it emits, in this order:
+
+- `forward` / `back` with `n > 0`: for each factor `f`, `n' = round(n * f)` clamped to 1..1000. Skip when `n' === n` or `n'` was already emitted for this node. `size = |n' - n| / n`.
+- `left` / `right`: for each delta `d`, `n' = n + d`. Skip when `n' < 0`, `n' > 3600` or `n' === n`. `size = |d| / 90`.
+- `left` / `right`: for each wait `w`, insert `wait w ` immediately before the keyword, on the same line, so line numbers do not change. `size = w / 2`.
+
+Example sizes: scaling 50 to 100 is 1.0, a 10 degree change is 0.11, `wait 0.5` is 0.25.
+
+`applyEdits(text, edits)` applies edits in descending `start` order and returns the new text. Edits in one candidate always target different nodes, so they never overlap. An edit inside a `repeat` body changes every pass of the loop, and its `text` says so.
+
+### Search
+
+1. Parse. On a parse error return `found: false` with the first error.
+2. Run the original program with `runToEnd`. If it passes, return `found: false` ("already passes"). This run is the "before" run and does not count toward the cap.
+3. **Singles:** simulate every single edit in generation order, stopping at the cap.
+4. **Pairs** (only if no single edit passed and the cap is not reached): build all pairs of single edits on different nodes. Sort them by `(size1 + size2, index1, index2)`. Simulate them in that order until the cap is reached. Once a pair passes, finish only the pairs with the same combined size, then stop.
+5. **Rank** the passing candidates by `(number of edits, total size, finish time t, charge used, generation index)` and take the first. Every key is a number from the simulation or the generation order, so the result is fully deterministic.
+
+`createSearch(level, text)` returns `{ step(maxCandidates), done, progress: { tried, cap }, result() }`. The UI calls `step` once per frame with as many candidates as fit in about 12 ms of work. `coach(level, text)` is `createSearch` run to completion. Both must give byte-identical results (same `JSON.stringify`).
+
+Measured cost: 0.6 to 1.3 ms per candidate in Node (346 to 1320 steps), so a full 3000-candidate search takes 2 to 4 s. That is why the UI spreads it over frames.
+
+### Result
+
+`coach(level, text) -> { found, program, edits, explanation, tried }`
+
+- `program`: the edited text when `found`, otherwise the original text.
+- `edits`: the chosen edits, each with `text` such as `Line 3: forward 50 -> forward 100`.
+- `tried`: how many candidates were simulated (at most 3000).
+- `explanation`: plain sentences, every number taken from the two runs' events and states and formatted with `explain.fmt`:
+  - Before: the root cause sentence from `explain()` of the original run, plus its end time and charge used.
+  - Change: the edit texts.
+  - After: finish time, charge used and percent of capacity.
+  - Comparison: one line per event type that occurred in either run (stall duration and current, slip count and peak force, collision count), for example `Stall: 3.5 s at 0.72 A before, none after.`
+  - Search: how many candidates were tried and how many passed.
+
+When nothing passes: `Tried 3000 small changes to distances, turn angles and waits, and none reached the goal. The closest ended 0.42 m from the goal (Line 5: forward 100 -> forward 150). The program probably needs a different command, not a different number.` When the cap is reached, the message says the search stopped at the limit.
+
+`coach` never throws. Bad input returns `found: false` with an explanation.
+
+### UI
+
+After a FAIL, the "Why did it fail?" panel shows a "SUGGEST A FIX" button. Pressing it locks the editor, runs the search a little each frame, and shows `Trying changes... 400 / 3000`. The result replaces the button: the edits, the explanation, and an "APPLY FIX" button that puts the edited program in the editor (edited lines highlighted in the gutter) without running it. Reset cancels the search. The button label and help text describe what the coach does ("tries small changes to your numbers and simulates each one") and never use the words AI, language model or machine learning.
