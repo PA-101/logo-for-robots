@@ -169,7 +169,13 @@ select {
 .note { margin: 4px 0 0; font-size: 14px; color: var(--muted); font-style: italic; }
 
 /* ---- why panel ------------------------------------------------------- */
-.why { min-height: 6em; }
+.result-panel[hidden] { display: none; }
+.result-panel.pass #result-head { color: var(--fg); }
+.result-panel.fail #result-head { color: var(--fail); text-shadow: none; }
+.cmds { margin: 6px 0 0; font-size: 15px; }
+.cmds dt { color: var(--fg); margin-top: 6px; }
+.cmds dd { margin: 0 0 0 1.2em; color: var(--muted); }
+.why { min-height: 2em; }
 .why .idle { color: var(--muted); }
 .why .verdict { font-size: 20px; margin: 0 0 6px; }
 .why .verdict.pass { color: var(--fg); }

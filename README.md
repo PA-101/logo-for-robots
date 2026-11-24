@@ -8,12 +8,12 @@ This project revives Logo, the 1960s turtle-programming language, to teach how r
 
 Open `index.html` in a current desktop browser by double-clicking it. There is no build step, no server and no install.
 
-To run the tests (once they exist), use Node 18 or newer:
+To run the tests, use Node 18 or newer:
 
 ```
 node --test tests/
 ```
 
-## Status
+## Known limitations
 
-Planning only. Steering files are in `.kiro/steering/` and the specs (requirements, design, tasks) are in `.kiro/specs/logo-robots/`. No app code has been written yet.
+- The battery capacity is scaled for demo: levels use a few coulombs so a flat battery happens within seconds.

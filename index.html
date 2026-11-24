@@ -45,14 +45,19 @@
 
       <details class="help">
         <summary>COMMANDS</summary>
-        <pre>forward 50       ; cm
-back 20
-left 90          ; degrees
-right 45
-repeat 4 [ ... ]
-if wall-ahead [ ... ]
-wait 1           ; seconds
-; comment</pre>
+        <dl class="cmds">
+          <dt>forward 50</dt><dd>drive forward 50 cm</dd>
+          <dt>back 20</dt><dd>drive backward 20 cm</dd>
+          <dt>left 90</dt><dd>turn left 90 degrees</dd>
+          <dt>right 45</dt><dd>turn right 45 degrees</dd>
+          <dt>wait 1</dt><dd>stop the motors for 1 s</dd>
+          <dt>power 60</dt><dd>drive at 60% power from here on (10 to 100)</dd>
+          <dt>until-bump</dt><dd>drive forward until the bumper touches a wall</dd>
+          <dt>repeat 4 [ forward 50 right 90 ]</dt><dd>run the block 4 times</dd>
+          <dt>if wall-ahead [ left 90 ]</dt><dd>run the block if a wall is under 35 cm ahead</dd>
+          <dt>if bumped [ back 10 ]</dt><dd>run the block if the robot touched a wall since the last check</dd>
+          <dt>; my note</dt><dd>a comment, ignored</dd>
+        </dl>
       </details>
     </section>
 
@@ -90,11 +95,12 @@ wait 1           ; seconds
           <span id="battery-pct" class="battery-pct">100%</span>
         </div>
         <div class="battery-bar"><div id="battery-fill" class="battery-fill"></div></div>
-        <p class="note">battery scaled for demo</p>
       </div>
 
-      <h2>WHY DID IT FAIL?</h2>
-      <div id="why" class="why" aria-live="polite"></div>
+      <div id="result-panel" class="result-panel" hidden>
+        <h2 id="result-head">RESULT</h2>
+        <div id="why" class="why" aria-live="polite"></div>
+      </div>
     </section>
   </main>
 

@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -74,11 +74,13 @@ test('the example program loaded at start parses and passes level 1', () => {
 
 test('page has every element the UI needs', () => {
   for (const id of ['boot', 'boot-text', 'code', 'gutter', 'run', 'reset', 'messages', 'level', 'level-hint',
-    'arena', 'graph', 'status', 'readout', 'battery-fill', 'battery-pct', 'why']) {
+    'arena', 'graph', 'status', 'readout', 'battery-fill', 'battery-pct', 'why', 'result-panel', 'result-head']) {
     assert.ok(new RegExp('id="' + id + '"').test(html), 'missing #' + id);
   }
   for (const s of SPEEDS) assert.ok(html.includes('data-speed="' + s + '"'), 'speed button ' + s);
-  assert.ok(html.includes('battery scaled for demo'));
+  // Part 1a (user request): the demo-battery note moved from the UI to the README's Known limitations.
+  assert.ok(!/battery scaled for demo/i.test(html), 'the label is gone from the page');
+  assert.ok(/battery capacity is scaled for demo/i.test(fs.readFileSync(path.join(__dirname, '..', 'README.md'), 'utf8')), 'and documented in the README');
   assert.ok(html.includes('LOGO FOR ROBOTS'));
 });
 
@@ -229,5 +231,50 @@ test('no app text calls the coach AI, a language model or machine learning', () 
   for (const file of ['coach.js', 'ui.js', 'index.html', 'README.md', 'style.css']) {
     const text = fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
     assert.ok(!/\bA\.?I\.?\b|language model|machine learning|\bLLM\b/i.test(text), file + ' mentions AI');
+  }
+});
+
+// ---- result panel and help (Part 1) ------------------------------------------------
+const { resultView } = require('../ui.js');
+
+test('result panel: hidden before a run, RESULT banner with one line on pass, no coach', () => {
+  assert.strictEqual(resultView(null).visible, false);
+  assert.strictEqual(resultView({ verdict: 'RUNNING', causes: [] }).visible, false);
+  const pass = resultView(explainRun(1, EXAMPLE_PROGRAM), fmt);
+  assert.strictEqual(pass.visible, true);
+  assert.strictEqual(pass.heading, 'RESULT');
+  assert.ok(/^PASS: reached the goal in \d+\.\d s with \d+% battery left\.$/.test(pass.line), pass.line);
+  assert.deepStrictEqual(pass.causes, []);
+  assert.strictEqual(pass.showCoach, false);
+});
+
+test('result panel: every failure uses the same heading, just the reasons, and the coach', () => {
+  const cases = [[1, 'forward 400'], [1, 'wait 30'], [1, 'forward 50'], [3, 'forward 200\nright 90\nforward 100\nleft 90\nforward 100']];
+  for (const [id, text] of cases) {
+    const exp = explainRun(id, text);
+    const v = resultView(exp, fmt);
+    assert.strictEqual(v.heading, 'WHY DID IT FAIL?');
+    assert.strictEqual(v.showCoach, true);
+    assert.strictEqual(v.causes.length, exp.causes.length);
+    assert.strictEqual(v.causes[0].tag, 'LIKELY ROOT CAUSE at ' + fmt(exp.causes[0].t, 1) + ' s');
+    // the status line names the same root cause
+    assert.ok(statusLine(exp, fmt).text.includes(exp.title));
+    const words = JSON.stringify(v) + statusLine(exp, fmt).text;
+    assert.ok(!/\bagain\b|still fail|\battempts?\b/i.test(words), words);
+  }
+  // the same failure twice gives the same panel (no attempt counting)
+  assert.deepStrictEqual(resultView(explainRun(1, 'forward 400'), fmt), resultView(explainRun(1, 'forward 400'), fmt));
+});
+
+test('the commands help lists every command with an example', () => {
+  const help = html.slice(html.indexOf('<details class="help">'), html.indexOf('</details>'));
+  for (const ex of ['forward 50', 'back 20', 'left 90', 'right 45', 'wait 1', 'power 60', 'until-bump',
+    'repeat 4 [ forward 50 right 90 ]', 'if wall-ahead [ left 90 ]', 'if bumped [ back 10 ]', '; my note']) {
+    assert.ok(help.includes('<dt>' + ex + '</dt>'), 'help lists ' + ex);
+  }
+  // every example in the help parses (comments alone are "nothing to run")
+  for (const m of help.matchAll(/<dt>([^<]+)<\/dt>/g)) {
+    const r = parse(m[1]);
+    assert.ok(r.ok || m[1].startsWith(';'), m[1] + ': ' + JSON.stringify(r.errors));
   }
 });

@@ -79,6 +79,24 @@
     return rows;
   }
 
+  // What the result panel shows for an explain() result (or null before a run / after Reset).
+  // Pass: a "RESULT" banner with one line, no causes, no coach. Fail: "WHY DID IT FAIL?" with
+  // just the reasons. The wording never depends on earlier runs.
+  function resultView(exp, fmt) {
+    var f = typeof fmt === 'function' ? fmt : function (x, d) { return Number(x || 0).toFixed(d); };
+    if (!exp || (exp.verdict !== 'PASS' && exp.verdict !== 'FAIL')) {
+      return { visible: false, heading: '', kind: '', line: '', causes: [], showCoach: false };
+    }
+    if (exp.verdict === 'PASS') {
+      var s = String(exp.summary || 'Reached the goal.');
+      return { visible: true, heading: 'RESULT', kind: 'pass', line: 'PASS: ' + s.charAt(0).toLowerCase() + s.slice(1), causes: [], showCoach: false };
+    }
+    var causes = (exp.causes || []).map(function (c) {
+      return { root: !!c.root, text: c.text, tag: (c.root ? 'LIKELY ROOT CAUSE' : 'ALSO') + ' at ' + f(c.t, 1) + ' s' };
+    });
+    return { visible: true, heading: 'WHY DID IT FAIL?', kind: 'fail', line: causes.length ? '' : String(exp.summary || ''), causes: causes, showCoach: true };
+  }
+
   var ARENA_PAD = 14;        // CSS px between the canvas edge and the level drawing
   var ARENA_MIN_H = 300;
 
@@ -99,6 +117,7 @@
     framePlan: framePlan,
     fitTransform: fitTransform,
     statusLine: statusLine,
+    resultView: resultView,
     arenaHeight: arenaHeight,
     lineDiff: lineDiff,
     COACH_FRAME_MS: 12
@@ -686,43 +705,40 @@
       L.explain.fmt(pct, 0) + '%  ' + L.explain.fmt(st.Vt, 2) + ' V';
   }
 
-  // ---- "Why did it fail?" panel ----------------------------------------
+  // ---- result panel ("RESULT" on pass, "WHY DID IT FAIL?" on failure) ------
   function renderWhy(sim, exp) {
     var box = el.why;
     box.textContent = '';
     box.classList.remove('flash', 'flash-pass');
-    if (!sim) {
-      var idle = document.createElement('p');
-      idle.className = 'idle';
-      idle.textContent = 'Run a program. If it fails, the reason appears here, with numbers from the run.';
-      box.appendChild(idle);
-      return;
-    }
-    var r = exp || L.explain.explain({ result: sim.result, events: sim.events, state: sim.state, level: app.level });
-    var head = document.createElement('p');
-    head.className = 'verdict ' + (r.verdict === 'PASS' ? 'pass' : 'fail');
-    head.textContent = r.verdict + (r.verdict === 'FAIL' ? ': ' + r.title : '');
-    box.appendChild(head);
-    if (r.verdict === 'PASS' || r.causes.length > 1 || !r.causes.length) {
-      var sum = document.createElement('p');
-      sum.className = 'summary';
-      sum.textContent = r.summary;
-      box.appendChild(sum);
-    }
-    if (r.causes.length) {
+    var r = sim ? (exp || L.explain.explain({ result: sim.result, events: sim.events, state: sim.state, level: app.level })) : null;
+    var view = resultView(r, L.explain.fmt);
+    el.resultPanel.hidden = !view.visible;
+    if (!view.visible) return;
+    el.resultHead.textContent = view.heading;
+    el.resultPanel.className = 'result-panel ' + view.kind;
+    if (view.kind === 'pass') {
+      var line = document.createElement('p');
+      line.className = 'verdict pass';
+      line.textContent = view.line;
+      box.appendChild(line);
+    } else if (view.causes.length) {
       var ol = document.createElement('ol');
-      r.causes.forEach(function (c) {
+      view.causes.forEach(function (c) {
         var li = document.createElement('li');
         var tag = document.createElement('span');
         tag.className = c.root ? 'root' : 'tag';
-        tag.textContent = (c.root ? 'LIKELY ROOT CAUSE' : 'ALSO') + ' at ' + L.explain.fmt(c.t, 1) + ' s';
+        tag.textContent = c.tag;
         li.appendChild(tag);
         li.appendChild(document.createTextNode(c.text));
         ol.appendChild(li);
       });
       box.appendChild(ol);
+    } else {
+      var only = document.createElement('p');
+      only.textContent = view.line;
+      box.appendChild(only);
     }
-    if (r.verdict === 'FAIL' && app.lastRunText) addCoachButton(box);
+    if (view.showCoach && app.lastRunText) addCoachButton(box);
     void box.offsetWidth; // restart the highlight animation
     box.classList.add(r.verdict === 'PASS' ? 'flash-pass' : 'flash');
   }
@@ -937,6 +953,8 @@
     ['code', 'gutter', 'run', 'reset', 'messages', 'level', 'arena', 'graph', 'status', 'readout', 'why']
       .forEach(function (id) { el[id] = $(id); });
     el.hint = $('level-hint');
+    el.resultPanel = $('result-panel');
+    el.resultHead = $('result-head');
     el.batteryFill = $('battery-fill');
     el.batteryPct = $('battery-pct');
 
