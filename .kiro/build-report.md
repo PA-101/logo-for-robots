@@ -23,3 +23,10 @@ Running log of the autonomous build. One entry per task: what was done, test cou
 - Chapter 3 checks: references use until-bump; a fixed-distance program from layout A passes A and fails B and C on all three levels. Coach timing on chapter 3: about 2.7 s for 6 searches, so MULTI_LAYOUT stays "search".
 - Tests: 265 pass.
 - Looks off: level 4's charge use jumps with battery size (75% at 2.9 C, 51% at 3.0 C), so its tuning is sensitive. Chapter 3 time limits are loose (references use 19 to 52%).
+
+## Task 27: generator gen.js
+
+- Mulberry32 seeded generator, difficulty schedule, wall-separated corridor path in a 15 x 11 grid, map cropped to the path, reference derived from the same segments (power 60 on ice segments from seed 91), battery and time from simulating the reference with the margin loop, deterministic retries, fallback level.
+- All 150 seeds build without the fallback (most on attempt 1, the worst needed 17 attempts). Generating all 150 takes about 4.6 s in Node.
+- Smoke test's expected script list now includes gen.js (same strictness; required by the design's script order).
+- Tests: 266 pass.

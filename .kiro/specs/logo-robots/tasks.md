@@ -85,7 +85,7 @@ Rule for every task below: all existing tests stay green, and `tests/compat.test
 
 ### Challenge Mode
 
-- [ ] 27. **Generator `gen.js`.** `makeRng`, `difficulty`, path building with wall separation, map, reference from the same path, ice power commands, the budget from simulation with the margin loop, deterministic retries and the fallback (design section 13). Add `gen.js` to `index.html` before `ui.js`. _Requirements: 12.1 to 12.5, 12.8_
+- [x] 27. **Generator `gen.js`.** `makeRng`, `difficulty`, path building with wall separation, map, reference from the same path, ice power commands, the budget from simulation with the margin loop, deterministic retries and the fallback (design section 13). Add `gen.js` to `index.html` before `ui.js`. _Requirements: 12.1 to 12.5, 12.8_
 
 - [ ] 28. **Generator property tests.** For all 150 seeds:
   - The reference passes with at least 25 percent margin in time and charge.

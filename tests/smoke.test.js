@@ -7,7 +7,7 @@ const { makeRng } = require('./helpers');
 
 const root = path.join(__dirname, '..');
 // Script order from design.md section 1 (coach.js added with the Auto-Fix Coach spec).
-const modules = ['lang', 'levels', 'sim', 'telemetry', 'explain', 'coach', 'ui'];
+const modules = ['lang', 'levels', 'sim', 'telemetry', 'explain', 'coach', 'gen', 'ui'];
 
 for (const name of modules) {
   test('module ' + name + '.js loads in Node without a DOM', () => {
