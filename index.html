@@ -74,8 +74,14 @@
         <button id="seed-prev" type="button" class="btn small">PREV</button>
         <button id="seed-next" type="button" class="btn small">NEXT</button>
       </div>
-      <p id="level-title" class="level-title"></p>
-      <p id="level-hint" class="hint"></p>
+      <div class="objective-box">
+        <p id="level-title" class="level-title"></p>
+        <p id="level-objective" class="objective"></p>
+        <details id="hint-box" class="hint-box">
+          <summary>HINT</summary>
+          <p id="level-hint" class="hint"></p>
+        </details>
+      </div>
       <div class="screen">
         <canvas id="arena" width="600" height="420" aria-label="Robot arena"></canvas>
       </div>

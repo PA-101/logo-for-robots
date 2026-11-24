@@ -262,3 +262,10 @@ option { color: var(--fg); }
 .chip.fail { border-color: var(--fail); color: var(--fail); text-shadow: none; }
 .chip.shown { outline: 1px dashed var(--muted); outline-offset: 2px; }
 .why .layout-note { margin: 0 0 4px; color: var(--warn); text-shadow: none; }
+
+/* ---- objectives ------------------------------------------------------- */
+.objective-box { margin: 4px 0 8px; }
+.objective { margin: 2px 0 4px; }
+.hint-box summary { cursor: pointer; color: var(--muted); font-size: 15px; }
+.hint-box summary:hover, .hint-box summary:focus-visible { color: var(--fg); }
+.hint-box .hint { margin: 4px 0 0; }

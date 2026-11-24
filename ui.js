@@ -143,6 +143,18 @@
     return { kind: 'level', id: isFinite(id) && id >= 1 ? id : 1 };
   }
 
+  // Title line, objective and hint shown above the arena. The title line is the header, plus the
+  // generated facts for challenge levels (for example 'Challenge 97 (seed 97): 7 turns, 1 icy patch').
+  function objectiveView(level) {
+    if (!level) return { title: '', objective: '', hint: '' };
+    var title = headerText(level);
+    if (level.chapter === 'challenge' && typeof level.title === 'string') {
+      var facts = level.title.replace(/^Challenge \d+:\s*/, '');
+      if (facts) title += ': ' + facts;
+    }
+    return { title: title, objective: level.objective || '', hint: level.hint || '' };
+  }
+
   function headerText(level) {
     if (!level) return '';
     if (level.chapter === 'challenge') return 'Challenge ' + level.seed + ' (seed ' + level.seed + ')';
@@ -174,6 +186,7 @@
     combineLayouts: combineLayouts,
     parseLevelKey: parseLevelKey,
     headerText: headerText,
+    objectiveView: objectiveView,
     CHALLENGE_VALUE: CHALLENGE_VALUE,
     arenaHeight: arenaHeight,
     lineDiff: lineDiff,
@@ -312,7 +325,10 @@
     app.levelId = app.level.id;
     app.visibleLayout = 0;
     el.seedRow.hidden = key.kind !== 'challenge';
-    el.levelTitle.textContent = headerText(app.level);
+    var view = objectiveView(app.level);
+    el.levelTitle.textContent = view.title;
+    el.levelObjective.textContent = view.objective;
+    el.hintBox.open = false;
     el.hint.textContent = app.level.hint || '';
     app.arena = null;
     sizeArena();
@@ -1092,6 +1108,8 @@
     el.seedRow = $('seed-row');
     el.levelTitle = $('level-title');
     el.chips = $('layout-chips');
+    el.levelObjective = $('level-objective');
+    el.hintBox = $('hint-box');
 
     var opts = hashOptions();
     levelOptions(L.levels.CHAPTERS, L.levels.ALL_LEVELS).forEach(function (g) {

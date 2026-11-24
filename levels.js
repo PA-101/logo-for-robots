@@ -11,7 +11,7 @@
     {
       id: 1,
       name: 'First Steps',
-      hint: 'Drive down the corridor, turn right and reach the goal.',
+      hint: 'Each floor cell is 50 cm. Count the cells before the corner.',
       map: [
         '#######',
         '#S....#',
@@ -175,6 +175,23 @@
   ];
 
   var ALL_LEVELS = LEVELS.concat(CHAPTER2, CHAPTER3);
+
+  // One-sentence objective per level, shown above the arena with the title and the hint.
+  var OBJECTIVES = {
+    1: 'Drive down the corridor, turn right and stop in the goal.',
+    2: 'Follow the zigzag down to the goal, ideally with a repeat loop.',
+    3: 'Get round the slick corner and reach the goal before the small battery runs out.',
+    4: 'Get round the icy hairpin to the goal without spinning the wheels into the walls.',
+    5: 'Cross four icy legs to the goal before the battery or the clock runs out.',
+    6: 'Cross the two long icy legs and the dry finish, changing power on the way.',
+    7: 'Find the end of a corridor of unknown length, then reach the goal below it.',
+    8: 'Follow two halls of unknown length to the goal on all three layouts.',
+    9: 'Find the door in the south wall and drive into the room below it.'
+  };
+  ALL_LEVELS.forEach(function (def) {
+    def.title = def.name;
+    def.objective = OBJECTIVES[def.id];
+  });
   var CHAPTERS = [
     { id: 1, name: 'Basics', levels: [1, 2, 3] },
     { id: 2, name: 'Grip and Power', levels: [4, 5, 6] },
@@ -215,6 +232,8 @@
       id: def.id,
       name: def.name,
       hint: def.hint,
+      title: def.title || def.name,
+      objective: def.objective || '',
       cell: CELL,
       width: nCols * CELL,
       height: nRows * CELL,

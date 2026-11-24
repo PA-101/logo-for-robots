@@ -1,4 +1,4 @@
-(function (root) {
+﻿(function (root) {
   'use strict';
 
   // Challenge Mode generator (design.md section 13). From a seed 1 to 150 it builds a corridor
@@ -152,16 +152,29 @@
     path.segments.forEach(function (s) { if (s.slick) slick++; });
     var metres = 0;
     path.segments.forEach(function (s) { metres += s.len * 0.5; });
-    return { turns: d.turns, slickPatches: d.ice ? 0 : slick, icePatches: d.ice ? slick : 0, metres: metres };
+    var turnList = path.segments.slice(1).map(function (s) { return s.turn > 0 ? 'right' : 'left'; });
+    return { turns: d.turns, slickPatches: d.ice ? 0 : slick, icePatches: d.ice ? slick : 0, metres: metres, turnList: turnList };
   }
 
   function plural(n, word) { return n + ' ' + word + (n === 1 ? '' : 'es'); }
 
+  // Title, objective and hint, built only from facts about the generated level.
   function describe(seed, f) {
     var parts = [f.turns + (f.turns === 1 ? ' turn' : ' turns')];
     if (f.slickPatches) parts.push(plural(f.slickPatches, 'slick patch'));
     if (f.icePatches) parts.push(plural(f.icePatches, 'icy patch'));
-    return 'Seed ' + seed + ': ' + parts.join(', ') + '.' + (f.icePatches ? ' Lower power on ice.' : '');
+    var hint;
+    if (f.icePatches) hint = 'Lower power before the ' + (f.icePatches === 1 ? 'icy patch' : plural(f.icePatches, 'icy patch')) + ' and raise it after.';
+    else {
+      hint = 'Count the turns: ' + f.turnList.join(', ') + '.';
+      if (f.slickPatches) hint += ' Expect some wheel slip on the ' + (f.slickPatches === 1 ? 'slick patch' : plural(f.slickPatches, 'slick patch')) + '.';
+    }
+    return {
+      title: 'Challenge ' + seed + ': ' + parts.join(', '),
+      // 'an 8.0 m', 'an 11.5 m', 'an 18.0 m'; 'a' otherwise
+      objective: 'Reach the goal at the end of ' + (/^(8|11|18)(\.|$)/.test(f.metres.toFixed(1)) ? 'an ' : 'a ') + f.metres.toFixed(1) + ' m corridor.',
+      hint: hint
+    };
   }
 
   function fallbackLevel(seed) {
@@ -169,9 +182,11 @@
       id: 1000 + seed, seed: seed, name: 'Challenge ' + seed, chapter: 'challenge',
       map: ['######', '#S..G#', '######'], slickMu: SLICK_MU, powerMatters: false,
       reference: 'forward 150', capacity: 1, timeLimit: 10, attempts: MAX_ATTEMPTS, fallback: true,
-      facts: { turns: 0, slickPatches: 0, icePatches: 0, metres: 1.5 }
+      facts: { turns: 0, slickPatches: 0, icePatches: 0, metres: 1.5, turnList: [] }
     };
-    def.hint = 'Seed ' + seed + ': a straight corridor.';
+    def.title = 'Challenge ' + seed + ': a straight corridor';
+    def.objective = 'Reach the goal at the end of a 1.5 m corridor.';
+    def.hint = 'Drive straight ahead.';
     var b = budget(def);
     if (b) { def.capacity = b.capacity; def.timeLimit = b.timeLimit; }
     return def;
@@ -191,7 +206,10 @@
           map: toMap(path), slickMu: d.ice ? ICE_MU : SLICK_MU, powerMatters: d.ice,
           reference: toReference(path, d.ice), attempts: attempt + 1, fallback: false, facts: f
         };
-        def.hint = describe(seed, f);
+        var text = describe(seed, f);
+        def.title = text.title;
+        def.objective = text.objective;
+        def.hint = text.hint;
         var b = budget(def);
         if (!b) continue;
         def.capacity = b.capacity;

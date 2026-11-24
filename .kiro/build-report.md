@@ -64,3 +64,10 @@ Running log of the autonomous build. One entry per task: what was done, test cou
 - The no-AI-wording test now also covers gen.js.
 - Tests: 282 pass.
 - Looks off: "PASS on all 3 layouts: Reached the goal in 4.8 s" quotes layout A's time, not the slowest layout's.
+
+## Task 33: level objectives
+
+- Every handpicked level has a title (its name), a one-sentence objective and a hint. Generated levels build all three from facts: the turn count and patch counts in the title, corridor length in metres in the objective, and either the real turn sequence or the icy-patch advice in the hint. Shown above the arena: the title line, the objective, and a collapsible HINT.
+- Level 1's hint was replaced, because it repeated the objective.
+- Bug found by checking the output by eye, not by a test: "a 11.5 m corridor". Fixed, and the new test checks the article.
+- Tests: 286 pass.
