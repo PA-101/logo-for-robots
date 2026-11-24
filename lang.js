@@ -50,15 +50,15 @@
         while (i < n && text[i] !== '\n') i++;
         continue;
       }
-      if (ch === '[') { tokens.push({ kind: 'open', text: '[', line: line }); i++; continue; }
-      if (ch === ']') { tokens.push({ kind: 'close', text: ']', line: line }); i++; continue; }
+      if (ch === '[') { tokens.push({ kind: 'open', text: '[', line: line, start: i, end: i + 1 }); i++; continue; }
+      if (ch === ']') { tokens.push({ kind: 'close', text: ']', line: line, start: i, end: i + 1 }); i++; continue; }
       var start = i;
       while (i < n) {
         var c = text[i];
         if (c === '\n' || c === ';' || c === '[' || c === ']' || isSeparator(c)) break;
         i++;
       }
-      tokens.push({ kind: 'word', text: text.slice(start, i), line: line });
+      tokens.push({ kind: 'word', text: text.slice(start, i), line: line, start: start, end: i });
     }
     return tokens;
   }
@@ -89,7 +89,16 @@
     return best;
   }
 
-  function parseTokens(tokens) {
+  // positions: when true, command nodes also get character offsets (see design.md section 8).
+  function parseTokens(tokens, positions) {
+    // Adds source offsets to a node only when asked, so the default node shape is unchanged.
+    function at(node, kwTok, num) {
+      if (!positions) return node;
+      node.start = kwTok.start;
+      if (num) { node.numStart = num.start; node.numEnd = num.end; }
+      return node;
+    }
+
     var pos = 0;
 
     function peek() { return pos < tokens.length ? tokens[pos] : null; }
@@ -108,7 +117,7 @@
           '. I found "' + show(tok.text) + '" instead.');
       }
       pos++;
-      return { value: parseFloat(tok.text), text: tok.text };
+      return { value: parseFloat(tok.text), text: tok.text, start: tok.start, end: tok.end };
     }
 
     function checkMax(keyword, num, max, line) {
@@ -155,17 +164,17 @@
       if (Object.prototype.hasOwnProperty.call(MOVES, word)) {
         num = readNumber(word, tok, word + ' 50');
         checkMax(word, num, MOVES[word], tok.line);
-        return { type: word, n: num.value, line: tok.line };
+        return at({ type: word, n: num.value, line: tok.line }, tok, num);
       }
       if (Object.prototype.hasOwnProperty.call(TURNS, word)) {
         num = readNumber(word, tok, word + ' 90');
         checkMax(word, num, TURNS[word], tok.line);
-        return { type: word, n: num.value, line: tok.line };
+        return at({ type: word, n: num.value, line: tok.line }, tok, num);
       }
       if (word === 'wait') {
         num = readNumber('wait', tok, 'wait 2');
         checkMax('wait', num, LIMITS.MAX_WAIT, tok.line);
-        return { type: 'wait', n: num.value, line: tok.line };
+        return at({ type: 'wait', n: num.value, line: tok.line }, tok, num);
       }
       if (word === 'repeat') {
         num = readNumber('repeat', tok, 'repeat 4 [ forward 50 right 90 ]');
@@ -178,7 +187,7 @@
         if (depth + 1 > LIMITS.MAX_DEPTH) {
           throw new ParseError(open.line, 'Blocks are nested too deeply (limit ' + LIMITS.MAX_DEPTH + ').');
         }
-        return { type: 'repeat', n: num.value, body: parseBlock(depth + 1, open), line: tok.line };
+        return at({ type: 'repeat', n: num.value, body: parseBlock(depth + 1, open), line: tok.line }, tok, num);
       }
       if (word === 'if') {
         var cond = peek();
@@ -190,7 +199,7 @@
         if (depth + 1 > LIMITS.MAX_DEPTH) {
           throw new ParseError(open2.line, 'Blocks are nested too deeply (limit ' + LIMITS.MAX_DEPTH + ').');
         }
-        return { type: 'if', cond: 'wall-ahead', body: parseBlock(depth + 1, open2), line: tok.line };
+        return at({ type: 'if', cond: 'wall-ahead', body: parseBlock(depth + 1, open2), line: tok.line }, tok, null);
       }
       if (NUMBER_RE.test(tok.text)) {
         throw new ParseError(tok.line, 'I expected a command like forward or left, but found the number ' + show(tok.text) + '.');
@@ -226,7 +235,8 @@
     return { ok: false, program: [], errors: [{ line: line, message: message }] };
   }
 
-  function parse(text) {
+  function parse(text, options) {
+    var positions = !!(options && typeof options === 'object' && options.positions === true);
     try {
       if (text === null || text === undefined) text = '';
       if (typeof text !== 'string') text = String(text);
@@ -235,7 +245,7 @@
       }
       var tokens = tokenize(text);
       if (tokens.length === 0) return fail(0, 'Nothing to run. Type a command like forward 50.');
-      var program = parseTokens(tokens);
+      var program = parseTokens(tokens, positions);
       if (program.length === 0) return fail(0, 'Nothing to run. Type a command like forward 50.');
       var running = 0;
       for (var i = 0; i < program.length; i++) {

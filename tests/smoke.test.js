@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -6,7 +6,8 @@ const path = require('node:path');
 const { makeRng } = require('./helpers');
 
 const root = path.join(__dirname, '..');
-const modules = ['lang', 'levels', 'sim', 'telemetry', 'explain', 'ui'];
+// Script order from design.md section 1 (coach.js added with the Auto-Fix Coach spec).
+const modules = ['lang', 'levels', 'sim', 'telemetry', 'explain', 'coach', 'ui'];
 
 for (const name of modules) {
   test('module ' + name + '.js loads in Node without a DOM', () => {
