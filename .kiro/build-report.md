@@ -104,3 +104,9 @@ Running log of the autonomous build. One entry per task: what was done, test cou
 - `tools/sim-mcp/server.js`: MCP over stdio (newline JSON-RPC 2.0, no dependencies) with list_levels, run_program(level_id, program) and suggest_fix(level_id, program); challenge ids are `challenge:N`. Bad ids, bad programs and bad messages return errors and never crash. README explains how to register it in Kiro. `tests/mcp.test.js` drives it through stdin and stdout (4 tests).
 - BLOCKED (registration and calls through Kiro): a Kiro permission rule ("kiro-scope") refused the write to `.kiro/settings/mcp.json`. I did not bypass it. So the tools were not in my catalogue, and `load_resource("tool::logo-for-robots-sim::list_levels")` was rejected. Exact errors are in docs/mcp-proof.md, with a direct stdio transcript that is labelled as not made through Kiro.
 - Tests: 305 pass.
+
+## Task 38: second hook
+
+- `.kiro/hooks/run-level-tests-on-save.json` runs the level and generator test files when `levels.js` or `gen.js` is saved, in the same v1 format as the first hook. It also runs `levels.tuning.test.js`, which is not in the spec's list but is a level test. A test checks both hooks parse, that the first hook is unchanged, that the matcher matches levels.js and gen.js but not sim.js, mylevels.js or tests/gen.test.js, and that every file the command names exists.
+- The first full run reported the new hook file as missing (the file write had not landed yet); a rerun passed. Not a code issue.
+- Tests: 308 pass.
