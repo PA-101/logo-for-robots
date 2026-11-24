@@ -30,3 +30,8 @@ Running log of the autonomous build. One entry per task: what was done, test cou
 - All 150 seeds build without the fallback (most on attempt 1, the worst needed 17 attempts). Generating all 150 takes about 4.6 s in Node.
 - Smoke test's expected script list now includes gen.js (same strictness; required by the design's script order).
 - Tests: 266 pass.
+
+## Task 28: generator property tests
+
+- All 150 seeds: the reference passes with at least 25% margin, no fallback, deterministic JSON, closed map within 15 x 11, the floor is one simple corridor (S and G have one floor neighbour, every other cell exactly two), the reference has exactly the planned turns, no slick floor below seed 31, no ice or power below seed 91, ice levels lower power. Odd seeds (0, -5, 151, 2.5, NaN, "17", "abc", null, Infinity) are clamped and never throw. Plus gen.test.js unit tests.
+- Tests: 275 pass; the whole suite takes about 13 s (the generator file is most of it).
