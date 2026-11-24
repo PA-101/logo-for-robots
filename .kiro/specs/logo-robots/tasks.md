@@ -120,7 +120,7 @@ Rule for every task below: all existing tests stay green, and `tests/compat.test
 
   _R14.3 to R14.5_
 
-- [ ] 35. **Export UI.** An "EXPORT TO MICROCONTROLLER CODE" button under the editor opens a panel with the generated text (read-only, monospace) and a COPY button. Copy uses the clipboard API when available and otherwise selects the text. A parse error shows the error instead of code. No third-party brand names appear anywhere in the UI. Tests: pure helpers for the panel text; the no-brand-name check covers `ui.js`, `index.html` and `export.js`. _R14.5, R14.6_
+- [x] 35. **Export UI.** An "EXPORT TO MICROCONTROLLER CODE" button under the editor opens a panel with the generated text (read-only, monospace) and a COPY button. Copy uses the clipboard API when available and otherwise selects the text. A parse error shows the error instead of code. No third-party brand names appear anywhere in the UI. Tests: pure helpers for the panel text; the no-brand-name check covers `ui.js`, `index.html` and `export.js`. _R14.5, R14.6_
 
 - [ ] 36. **Judge shortcuts.** A row of quick-jump buttons above the editor: BASICS (level 1), GRIP AND POWER (level 4), BUMPERS (level 7), CHALLENGE 75, CHALLENGE 150. Each loads that level and its starter text, like choosing it in the picker. Test: a pure helper maps each button to the same level the picker would load. _R14.7_
 

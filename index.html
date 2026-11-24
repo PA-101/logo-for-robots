@@ -43,6 +43,8 @@
 
       <div id="messages" class="messages" role="status" aria-live="polite"></div>
 
+      <button id="export" type="button" class="btn export-btn">EXPORT TO MICROCONTROLLER CODE</button>
+
       <details class="help">
         <summary>COMMANDS</summary>
         <dl class="cmds">
@@ -117,6 +119,19 @@
       </div>
     </section>
   </main>
+
+  <dialog id="export-dialog" class="export-dialog" aria-labelledby="export-title">
+    <div class="export-head">
+      <h2 id="export-title">MICROCONTROLLER CODE (C++)</h2>
+      <div class="export-actions">
+        <button id="export-copy" type="button" class="btn primary">COPY</button>
+        <button id="export-close" type="button" class="btn">CLOSE</button>
+      </div>
+    </div>
+    <p class="note export-note">Plain C++ for a two-wheeled robot with two PWM motor outputs. The timing constants are uncalibrated: tune them on your robot.</p>
+    <p id="export-status" class="export-status" role="status" aria-live="polite"></p>
+    <textarea id="export-code" class="export-code" readonly spellcheck="false" wrap="off" aria-label="Exported C++ code"></textarea>
+  </dialog>
 
   <script src="lang.js"></script>
   <script src="levels.js"></script>

@@ -112,6 +112,15 @@
     return { multi: chips.length > 1, pass: chips.length > 0 && firstFail < 0, focus: firstFail < 0 ? v : firstFail, chips: chips };
   }
 
+  // What the export dialog shows for the editor text: the code, or the first parse error.
+  function exportView(text, title, exporter) {
+    var ex = exporter || (typeof module !== 'undefined' ? require('./export.js') : root.LFR.exporter);
+    var r = ex.toCpp(text, { title: title });
+    if (r.ok) return { ok: true, code: r.code, status: 'Ready to copy: ' + r.code.split('\n').length + ' lines.' };
+    var e = r.errors[0] || { line: 0, message: 'The program could not be exported.' };
+    return { ok: false, code: '', status: 'Fix the program first. ' + (e.line > 0 ? 'Line ' + e.line + ': ' : '') + e.message };
+  }
+
   // ---- level picker helpers (pure) -------------------------------------
   var CHALLENGE_VALUE = 'challenge';
 
@@ -187,6 +196,7 @@
     parseLevelKey: parseLevelKey,
     headerText: headerText,
     objectiveView: objectiveView,
+    exportView: exportView,
     CHALLENGE_VALUE: CHALLENGE_VALUE,
     arenaHeight: arenaHeight,
     lineDiff: lineDiff,
@@ -1138,7 +1148,39 @@
     });
     updateGutter();
 
-    el.run.addEventListener('click', run);
+    el.run.addEventListener('click', function () { run(); });
+
+    // Export dialog: plain C++ for the program in the editor, with a Copy button.
+    var dlg = $('export-dialog'), exCode = $('export-code'), exStatus = $('export-status'), exCopy = $('export-copy');
+    $('export').addEventListener('click', function () {
+      var v = exportView(el.code.value, headerText(app.level));
+      exCode.value = v.code;
+      exCode.hidden = !v.ok;
+      exCopy.disabled = !v.ok;
+      exStatus.textContent = v.status;
+      exStatus.className = 'export-status' + (v.ok ? '' : ' error');
+      if (typeof dlg.showModal === 'function') dlg.showModal(); else dlg.setAttribute('open', '');
+      (v.ok ? exCopy : $('export-close')).focus();
+    });
+    $('export-close').addEventListener('click', function () {
+      if (typeof dlg.close === 'function') dlg.close(); else dlg.removeAttribute('open');
+    });
+    exCopy.addEventListener('click', function () {
+      function selected() {
+        exCode.focus();
+        exCode.select();
+        var ok = false;
+        try { ok = document.execCommand && document.execCommand('copy'); } catch (e) { ok = false; }
+        exStatus.textContent = ok ? 'Copied to the clipboard.' : 'The code is selected. Press Ctrl+C to copy it.';
+      }
+      if (root.navigator && root.navigator.clipboard && root.isSecureContext) {
+        root.navigator.clipboard.writeText(exCode.value).then(function () {
+          exStatus.textContent = 'Copied to the clipboard.';
+        }, selected);
+      } else {
+        selected();
+      }
+    });
     el.reset.addEventListener('click', function () { reset(); showMessage(''); });
     el.level.addEventListener('change', function () { loadLevel(parseLevelKey(el.level.value, app.seed)); });
 

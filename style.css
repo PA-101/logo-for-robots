@@ -269,3 +269,39 @@ option { color: var(--fg); }
 .hint-box summary { cursor: pointer; color: var(--muted); font-size: 15px; }
 .hint-box summary:hover, .hint-box summary:focus-visible { color: var(--fg); }
 .hint-box .hint { margin: 4px 0 0; }
+
+/* ---- export dialog ------------------------------------------------------ */
+.export-btn { margin-top: 12px; width: 100%; letter-spacing: 0.02em; font-size: 15px; padding: 6px 8px; }
+.export-dialog {
+  width: min(900px, 92vw);
+  max-height: 88vh;
+  padding: 16px;
+  color: var(--fg);
+  background: var(--panel);
+  border: 1px solid var(--fg);
+  font-family: var(--font);
+  text-shadow: var(--glow);
+}
+.export-dialog::backdrop { background: rgba(0, 0, 0, 0.75); }
+.export-dialog[open] { display: flex; flex-direction: column; gap: 8px; }
+.export-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.export-head h2 { margin: 0; color: var(--fg); }
+.export-actions { display: flex; gap: 8px; }
+.export-note { margin: 0; }
+.export-status { margin: 0; min-height: 1.4em; color: var(--muted); }
+.export-status.error { color: var(--fail); text-shadow: none; }
+.export-code {
+  flex: 1;
+  min-height: 50vh;
+  width: 100%;
+  resize: vertical;
+  font: 14px/1.4 var(--font);
+  color: var(--fg);
+  background: #040a05;
+  border: 1px solid var(--dim);
+  padding: 8px;
+  white-space: pre;
+  overflow: auto;
+  text-shadow: none;
+}
+.export-code[hidden] { display: none; }

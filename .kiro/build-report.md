@@ -78,3 +78,10 @@ Running log of the autonomous build. One entry per task: what was done, test cou
 - Five fixed expected outputs are in tests/fixtures/export/. `scripts/check-export-compiles.js` compiled all five with g++ -std=c++11 -Wall -Wextra -fsyntax-only against stub board functions: all OK (a developer check, not part of node --test).
 - Tests: 296 pass.
 - Physically: the export uses dead reckoning by time, so on a real robot distances and angles will drift; the header says so.
+
+## Task 35: export UI
+
+- An "EXPORT TO MICROCONTROLLER CODE" button under the editor opens a modal dialog with the generated C++ (read-only), an uncalibrated note, COPY and CLOSE. A parse error shows "Fix the program first. Line N: ..." instead of code, with COPY disabled. Copy uses the clipboard API in a secure context, otherwise it selects the text and tries execCommand.
+- Browser check: the dialog opens with 60 lines for level 1, and the bad-program case works. No page errors.
+- Tests: 298 pass.
+- Not verified: in headless Chrome over file:// the clipboard write was not available, so COPY fell back to "The code is selected. Press Ctrl+C to copy it." The clipboard path on GitHub Pages (https) needs a real click to confirm.

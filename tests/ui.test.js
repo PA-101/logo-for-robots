@@ -346,3 +346,25 @@ test('combineLayouts on real chapter 3 runs: the fixed-distance program passes A
   const ref = layouts.map((l) => runToEnd(l, parse(l.reference).program).result);
   assert.strictEqual(combineLayouts(layouts.map((l) => l.layout), ref, 0).pass, true);
 });
+
+// ---- export dialog (task 35) ---------------------------------------------------
+const { exportView } = require('../ui.js');
+
+test('exportView returns the code for a valid program and the error line for a bad one', () => {
+  const ok = exportView('forward 50\nleft 90', 'Level 1: First Steps');
+  assert.strictEqual(ok.ok, true);
+  assert.ok(ok.code.includes('runProgram') && ok.code.includes('"Level 1: First Steps"'));
+  assert.ok(/^Ready to copy: \d+ lines\.$/.test(ok.status), ok.status);
+  const bad = exportView('forward 50\njump 3', 'x');
+  assert.strictEqual(bad.ok, false);
+  assert.strictEqual(bad.code, '');
+  assert.ok(bad.status.startsWith('Fix the program first. Line 2: '), bad.status);
+});
+
+test('the page has the export button and a dialog with read-only code, COPY and CLOSE', () => {
+  assert.ok(html.includes('>EXPORT TO MICROCONTROLLER CODE</button>'));
+  assert.ok(/<dialog id="export-dialog"/.test(html));
+  assert.ok(/<textarea id="export-code"[^>]*readonly/.test(html));
+  assert.ok(html.includes('id="export-copy"') && html.includes('id="export-close"'));
+  assert.ok(/uncalibrated/i.test(html.slice(html.indexOf('<dialog'), html.indexOf('</dialog>'))));
+});
