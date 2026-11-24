@@ -40,3 +40,8 @@ Running log of the autonomous build. One entry per task: what was done, test cou
 
 - Seeds 5, 20, ..., 140 with the last forward halved: the coach finds a fix for all 10; each fix parses, passes and has 1 or 2 edits; each search stays within 3000 candidates. The whole test takes about 5.6 s (target 15 s).
 - Tests: 276 pass.
+
+## Task 29: coach on generated levels
+
+- Seeds 5, 20, ..., 140 with the last forward halved: the coach finds a fix for all 10; each fix parses, passes and has 1 or 2 edits; each search stays within 3000 candidates. The whole test takes about 5.6 s (target 15 s).
+- Tests: 276 pass (suite about 15 s).
