@@ -3,36 +3,204 @@
   --panel: #0a110a;
   --fg: #33ff66;
   --dim: #1a7a33;
+  --muted: #7fd99a;
   --warn: #ffb000;
   --fail: #ff3b30;
+  --glow: 0 0 4px rgba(51, 255, 102, 0.45);
   --font: "Cascadia Mono", Consolas, "Courier New", monospace;
 }
 
 * { box-sizing: border-box; }
 
+html, body { background: var(--bg); }
+
 body {
   margin: 0;
-  padding: 16px;
-  background: var(--bg);
+  padding: 16px 20px 24px;
   color: var(--fg);
   font-family: var(--font);
   font-size: 16px;
   line-height: 1.4;
+  text-shadow: var(--glow);
+  min-width: 1240px;
 }
 
-h1, h2 { margin: 0 0 8px; font-weight: normal; }
-h1 { font-size: 24px; }
-h2 { font-size: 16px; color: var(--dim); }
-.tagline { margin: 0 0 16px; color: var(--dim); }
+h1, h2 { margin: 0 0 8px; font-weight: normal; letter-spacing: 0.08em; }
+h1 { font-size: 26px; }
+h2 { font-size: 16px; color: var(--muted); }
+
+.top { display: flex; align-items: baseline; gap: 20px; margin-bottom: 14px; }
+.tagline { margin: 0; color: var(--muted); }
 
 main {
   display: grid;
-  grid-template-columns: 1fr 1.2fr 1fr;
+  grid-template-columns: 330px 640px 1fr;
   gap: 16px;
+  align-items: start;
 }
 
 .panel {
   background: var(--panel);
   border: 1px solid var(--dim);
   padding: 12px;
+  box-shadow: 0 0 12px rgba(51, 255, 102, 0.06) inset;
+}
+
+.label { color: var(--muted); }
+
+/* ---- editor ---------------------------------------------------------- */
+.editor {
+  display: flex;
+  border: 1px solid var(--dim);
+  background: #040a05;
+  height: 300px;
+}
+.gutter {
+  margin: 0;
+  padding: 8px 6px 8px 8px;
+  min-width: 3.2em;
+  text-align: right;
+  color: var(--dim);
+  user-select: none;
+  overflow: hidden;
+  font: inherit;
+  line-height: 1.4;
+  text-shadow: none;
+  border-right: 1px solid #10301a;
+}
+.gutter .err { color: var(--fail); }
+#code {
+  flex: 1;
+  margin: 0;
+  padding: 8px;
+  border: 0;
+  outline: none;
+  resize: none;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  line-height: 1.4;
+  text-shadow: var(--glow);
+  caret-color: var(--fg);
+  white-space: pre;
+  overflow: auto;
+}
+#code[readonly] { color: var(--muted); }
+.editor:focus-within { border-color: var(--fg); }
+
+/* ---- buttons --------------------------------------------------------- */
+.controls { display: flex; gap: 8px; margin: 12px 0 10px; }
+.btn {
+  font: inherit;
+  color: var(--fg);
+  background: transparent;
+  border: 1px solid var(--fg);
+  padding: 6px 16px;
+  cursor: pointer;
+  text-shadow: var(--glow);
+  letter-spacing: 0.08em;
+}
+.btn:hover:not(:disabled) { background: rgba(51, 255, 102, 0.12); }
+.btn:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+.btn.primary { background: rgba(51, 255, 102, 0.16); }
+.btn:disabled { color: var(--dim); border-color: var(--dim); cursor: not-allowed; text-shadow: none; }
+.btn.small { padding: 2px 8px; }
+.btn.active { background: var(--fg); color: var(--bg); text-shadow: none; }
+
+.speed { display: flex; align-items: center; gap: 6px; }
+.speed .label { margin-right: 4px; }
+
+.messages { margin-top: 12px; min-height: 1.4em; }
+.messages .error { color: var(--fail); text-shadow: none; cursor: pointer; }
+.messages .error::before { content: "ERROR "; font-weight: bold; }
+.messages .ok { color: var(--muted); }
+
+.help { margin-top: 12px; color: var(--muted); }
+.help summary { cursor: pointer; }
+.help pre { margin: 6px 0 0; font: inherit; font-size: 15px; color: var(--muted); }
+
+/* ---- arena ----------------------------------------------------------- */
+.arena-head { display: flex; justify-content: space-between; align-items: baseline; }
+.level-pick { color: var(--muted); }
+select {
+  font: inherit;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--fg);
+  padding: 2px 6px;
+  margin-left: 6px;
+}
+.hint { margin: 0 0 8px; color: var(--muted); min-height: 1.4em; }
+
+.screen { position: relative; line-height: 0; border: 1px solid var(--dim); }
+.screen canvas { display: block; width: 100%; height: auto; background: #030603; }
+/* Subtle scanlines over canvases only, never over text. */
+.screen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0) 0, rgba(0, 0, 0, 0) 2px, rgba(0, 0, 0, 0.18) 3px);
+}
+
+.legend { display: flex; flex-wrap: wrap; gap: 14px; margin: 8px 0; color: var(--muted); font-size: 15px; }
+.legend .sw { display: inline-block; width: 14px; height: 10px; margin-right: 6px; vertical-align: middle; }
+.sw.wall { background: #145c28; border: 1px solid var(--fg); }
+.sw.slick { background: repeating-linear-gradient(45deg, #0d2e3a 0 3px, #1d5f75 3px 5px); }
+.sw.goal { border: 1px solid var(--fg); background: rgba(51, 255, 102, 0.18); }
+.sw.ray { height: 2px; background: var(--fg); }
+.sw.skid { height: 4px; background: var(--warn); opacity: 0.7; }
+
+.status { font-size: 18px; min-height: 1.5em; }
+.status .pass { color: var(--fg); }
+.status .fail { color: var(--fail); text-shadow: none; }
+.status .warn { color: var(--warn); text-shadow: none; }
+.readout { color: var(--muted); font-size: 15px; white-space: pre; min-height: 2.8em; }
+
+/* ---- telemetry and battery ------------------------------------------ */
+.battery { margin: 12px 0 16px; }
+.battery-head { display: flex; justify-content: space-between; }
+.battery-bar { height: 14px; border: 1px solid var(--dim); margin-top: 4px; }
+.battery-fill { height: 100%; width: 100%; background: var(--fg); box-shadow: var(--glow); }
+.battery-fill.warn { background: var(--warn); }
+.battery-fill.fail { background: var(--fail); }
+.battery-pct.warn { color: var(--warn); text-shadow: none; }
+.battery-pct.fail { color: var(--fail); text-shadow: none; }
+.note { margin: 4px 0 0; font-size: 14px; color: var(--muted); font-style: italic; }
+
+/* ---- why panel ------------------------------------------------------- */
+.why { min-height: 6em; }
+.why .idle { color: var(--muted); }
+.why .verdict { font-size: 20px; margin: 0 0 6px; }
+.why .verdict.pass { color: var(--fg); }
+.why .verdict.fail { color: var(--fail); text-shadow: none; }
+.why ol { margin: 6px 0 0; padding-left: 1.4em; }
+.why li { margin-bottom: 8px; }
+.why .root { color: var(--fail); text-shadow: none; font-weight: bold; display: block; }
+.why .tag { color: var(--warn); text-shadow: none; display: block; }
+.why .summary { margin: 0 0 8px; }
+.why.flash { animation: why-in 0.4s ease-out; }
+@keyframes why-in { from { background: rgba(255, 59, 48, 0.25); } to { background: transparent; } }
+
+/* ---- boot ------------------------------------------------------------ */
+.boot {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  cursor: pointer;
+  transition: opacity 0.25s ease-out;
+}
+.boot.done { opacity: 0; pointer-events: none; }
+.boot-inner { text-align: center; }
+.boot-text { font-size: 44px; letter-spacing: 0.12em; text-shadow: 0 0 10px rgba(51, 255, 102, 0.7); }
+.boot-cursor { font-size: 44px; animation: blink 0.6s steps(1) infinite; }
+.boot-skip { color: var(--muted); font-size: 15px; margin-top: 18px; }
+@keyframes blink { 50% { opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .boot-cursor, .why.flash { animation: none; }
 }

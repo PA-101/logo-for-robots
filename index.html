@@ -7,7 +7,14 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header>
+  <div id="boot" class="boot" aria-hidden="true">
+    <div class="boot-inner">
+      <span id="boot-text" class="boot-text"></span><span class="boot-cursor">_</span>
+      <p class="boot-skip">click to skip</p>
+    </div>
+  </div>
+
+  <header class="top">
     <h1>LOGO FOR ROBOTS</h1>
     <p class="tagline">Program a turtle. Meet the real robot.</p>
   </header>
@@ -15,21 +22,79 @@
   <main>
     <section id="editor-panel" class="panel" aria-label="Program">
       <h2>PROGRAM</h2>
-      <div id="editor-area"></div>
-      <div id="controls"></div>
-      <div id="messages" role="status"></div>
+      <div class="editor">
+        <pre id="gutter" class="gutter" aria-hidden="true"></pre>
+        <textarea id="code" spellcheck="false" autocomplete="off" autocapitalize="off" wrap="off"
+                  aria-label="Logo program"></textarea>
+      </div>
+
+      <div class="controls">
+        <button id="run" type="button" class="btn primary">RUN</button>
+        <button id="reset" type="button" class="btn">RESET</button>
+      </div>
+
+      <div class="speed" role="group" aria-label="Simulation speed">
+        <span class="label">SPEED</span>
+        <button type="button" class="btn small" data-speed="0.5">0.5x</button>
+        <button type="button" class="btn small" data-speed="1">1x</button>
+        <button type="button" class="btn small" data-speed="2">2x</button>
+        <button type="button" class="btn small" data-speed="4">4x</button>
+      </div>
+
+      <div id="messages" class="messages" role="status" aria-live="polite"></div>
+
+      <details class="help">
+        <summary>COMMANDS</summary>
+        <pre>forward 50       ; cm
+back 20
+left 90          ; degrees
+right 45
+repeat 4 [ ... ]
+if wall-ahead [ ... ]
+wait 1           ; seconds
+; comment</pre>
+      </details>
     </section>
 
     <section id="arena-panel" class="panel" aria-label="Arena">
-      <h2>ARENA</h2>
-      <div id="arena-area"></div>
+      <div class="arena-head">
+        <h2>ARENA</h2>
+        <label class="level-pick">LEVEL
+          <select id="level"></select>
+        </label>
+      </div>
+      <p id="level-hint" class="hint"></p>
+      <div class="screen">
+        <canvas id="arena" width="600" height="420" aria-label="Robot arena"></canvas>
+      </div>
+      <div class="legend" aria-hidden="true">
+        <span><i class="sw wall"></i>wall</span>
+        <span><i class="sw slick"></i>slick floor</span>
+        <span><i class="sw goal"></i>goal</span>
+        <span><i class="sw ray"></i>sensor ray</span>
+        <span><i class="sw skid"></i>skid mark</span>
+      </div>
+      <div id="status" class="status" role="status" aria-live="polite"></div>
+      <div id="readout" class="readout"></div>
     </section>
 
     <section id="info-panel" class="panel" aria-label="Telemetry and explanation">
       <h2>TELEMETRY</h2>
-      <div id="telemetry-area"></div>
+      <div class="screen">
+        <canvas id="graph" width="380" height="300" aria-label="Telemetry graph"></canvas>
+      </div>
+
+      <div class="battery">
+        <div class="battery-head">
+          <span class="label">BATTERY</span>
+          <span id="battery-pct" class="battery-pct">100%</span>
+        </div>
+        <div class="battery-bar"><div id="battery-fill" class="battery-fill"></div></div>
+        <p class="note">battery scaled for demo</p>
+      </div>
+
       <h2>WHY DID IT FAIL?</h2>
-      <div id="why-area"></div>
+      <div id="why" class="why" aria-live="polite"></div>
     </section>
   </main>
 

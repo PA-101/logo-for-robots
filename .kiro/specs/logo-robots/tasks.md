@@ -24,7 +24,7 @@ Build in this order. Each task is small, ends with a passing `node --test tests/
 
 - [x] 11. **Explain (`explain.js`) with tests.** One test per cause (stall, battery flat, slip, timeout, program ended short), multiple causes ordered earliest first with the root flag, PASS text, and numbers in the text match the event fields exactly. Property test: `explain` never throws on random event logs. _Requirements: 5.1 to 5.8_
 
-- [ ] 12. **UI shell (`ui.js`, `index.html`, `style.css`).** Editor with example program, level selector, Run, Reset, speed control (0.5x, 1x, 2x, 4x), parse errors shown with line numbers, fixed-timestep accumulator loop, arena canvas drawing (walls, slick cells, goal, robot, sensor ray, trail). Editor locked while running. _Requirements: 1.1, 1.10, 1.12, 2.1, 3.6, 6.1 to 6.4_
+- [x] 12. **UI shell (`ui.js`, `index.html`, `style.css`).** Editor with example program, level selector, Run, Reset, speed control (0.5x, 1x, 2x, 4x), parse errors shown with line numbers, fixed-timestep accumulator loop, arena canvas drawing (walls, slick cells, goal, robot, sensor ray, trail). Editor locked while running. _Requirements: 1.1, 1.10, 1.12, 2.1, 3.6, 6.1 to 6.4_
 
 - [ ] 13. **Telemetry graph and "Why did it fail?" panel.** Graph canvas with reserved margins for axes and legend (speed green, current amber, battery dashed), cleared on Reset; panel with PASS/FAIL result and the explain text; amber and red styling with text labels. _Requirements: 4.2, 4.3, 4.4, 5.1 to 5.8_
 
