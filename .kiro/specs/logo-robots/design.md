@@ -13,11 +13,13 @@ sim.js          physics + interpreter       (no DOM)
 telemetry.js    sample recorder + graph scaling (no DOM)
 explain.js      failure explanation         (no DOM)
 coach.js        Auto-Fix Coach search       (no DOM)
+gen.js          Challenge Mode level generator (no DOM)
 ui.js           editor, controls, canvas drawing, main loop (only DOM user)
 tests/          helpers.js, *.test.js (node --test tests/)
+tests/fixtures/ golden-runs.json (recorded before the power/bumper change, see section 12)
 ```
 
-Script order in `index.html`: `lang.js`, `levels.js`, `sim.js`, `telemetry.js`, `explain.js`, `coach.js`, `ui.js`. Each logic file ends with `if (typeof module !== 'undefined') module.exports = {...}` and otherwise attaches to `window.LFR.<name>` (see steering/tech.md). Under Node, files load each other with `require`.
+Script order in `index.html`: `lang.js`, `levels.js`, `sim.js`, `telemetry.js`, `explain.js`, `coach.js`, `gen.js`, `ui.js`. Each logic file ends with `if (typeof module !== 'undefined') module.exports = {...}` and otherwise attaches to `window.LFR.<name>` (see steering/tech.md). Under Node, files load each other with `require`.
 
 ## 2. Units and coordinates
 - SI units in the simulation: meters, seconds, kilograms, newtons, amperes, volts, coulombs, radians.
@@ -59,6 +61,9 @@ Script order in `index.html`: `lang.js`, `levels.js`, `sim.js`, `telemetry.js`, 
 | `STALL_SPEED` | | 0.02 m/s | below this, a pushing robot counts as stalled |
 | `STALL_TIME` | | 0.5 s | time below `STALL_SPEED` before a `stall` event |
 | `SAMPLE_EVERY` | | 6 steps | telemetry rate (10 Hz) |
+| `STALL_DUTY` | | 0.2 | a wheel counts as "commanded" above `STALL_DUTY * power` |
+| `BUMPER_COS` | | 0.5 | bumper pressed when a contact normal `n` has `n . heading < -BUMPER_COS` (within 60 degrees of straight ahead) |
+| `UNTIL_BUMP_TIMEOUT` | | 15 s | longest `until-bump` drive before `bump_timeout` |
 
 Derived (documented for tests): no-load speed `V_NL = WHEEL_R * V_FULL / KE = 0.80 m/s`. Normal force per wheel `N = MASS * G / 2 = 9.81 N`. Friction limit per wheel `F_max = mu * N` (5.89 N on normal floor).
 
@@ -89,7 +94,8 @@ State: `x, y, theta, v` (forward speed), `w` (yaw rate), `wL, wR` (wheel angular
    - `theta += DT * w`
    - `x += DT * v * cos(theta)`, `y += DT * v * sin(theta)`
 6. **Walls**: for each wall rectangle, find the closest point `p` to the center. If `|center - p| < BODY_R`, move the center out along the normal `n` so the distance equals `BODY_R`. Remove the part of the world velocity pointing into the wall (`vn = vel . n`, if `vn < 0`, `vel -= vn * n`), then `v = vel . heading`. Record a `collision` event when contact begins with impact speed above 0.05 m/s. `contact = true` while touching.
-7. **Stall timer**: if `contact` and `max(|uL|, |uR|) > 0.2` and `|v| < STALL_SPEED`, add `DT` to `stallTime`; otherwise reset it to 0. When `stallTime` first reaches `STALL_TIME`, record a `stall` event; the event's `duration` and `current` (latest `I_motor`) update while the stall continues.
+6b. **Bumper and bumped flag** (new, after the wall loop): `bumper = true` if any wall contact this step has `n . (cos theta, sin theta) < -BUMPER_COS`. If contact begins this step (`touching && !wasContact`, any speed), set `bumpedFlag = true`. Neither changes motion; `collision` events keep their 0.05 m/s threshold.
+7. **Stall timer**: if `contact` and `max(|uL|, |uR|) > STALL_DUTY * power` and `|v| < STALL_SPEED`, add `DT` to `stallTime`; otherwise reset it to 0. When `stallTime` first reaches `STALL_TIME`, record a `stall` event; the event's `duration` and `current` (latest `I_motor`) update while the stall continues.
 8. **Battery**: `charge = max(0, charge - I_draw * DT)`. If `charge == 0`, set `uL = uR = 0`, record `battery_flat` once, end the run.
 9. **Goal and time**: if the center is inside the goal rectangle, record `goal` and end with PASS. If `t >= timeLimit`, record `timeout` and end with FAIL. `t += DT`.
 
@@ -103,11 +109,19 @@ The interpreter holds a stack of frames `{nodes, index, remaining}` and one acti
 - `forward/back N`: start a move with `target = N / 100` m, direction `d = +1 / -1`, and `travelled = 0`.
 - `left/right N`: start a turn with `target = N * pi / 180`, direction `d = +1 / -1`, and `turned = 0`.
 - `wait N`: start a wait of `N` seconds.
+- `power N` (new): set `power = N / 100` at once and take the next node in the same step (no time passes). `power` starts at 1.
+- `if bumped` (new): read `bumpedFlag`, clear it, push the body if it was set.
+- `until-bump` (new): start a bump drive with `elapsed = 0`.
+
+Every drive duty below is multiplied by `power` (`CRUISE_DUTY * power`, `TURN_DUTY * power`, `TURN_SLOW_DUTY * power`). With `power = 1` the numbers are exactly the original ones, so programs without `power` run bit-for-bit as before.
 
 Active command behavior (each step):
-- **Move**: `travelled += d * v * DT`, `rem = target - travelled`. While `rem > BRAKE_TAU * |v| + 0.005`: `uL = uR = d * CRUISE_DUTY`. Otherwise `uL = uR = 0` (brake). The move ends when `rem <= BRAKE_TAU * |v| + 0.005`, `|v| < 0.02` and `|w| < 0.05`. If the robot is blocked and stalled, it keeps pushing until the timeout or battery ends the run.
-- **Turn**: `turned += d * w * DT`, `rem = target - turned`. While `rem > TURN_BRAKE_TAU * |w| + 0.01`: `uL = -d * td`, `uR = d * td`, where `td = TURN_SLOW_DUTY` if `rem < TURN_SLOW_ZONE` and `TURN_DUTY` otherwise. Otherwise brake (`u = 0`). Moves and turns latch into braking: once braking starts it continues until the command ends. Ends when braking and `|w| < 0.05` and `|v| < 0.02`.
+- **Move**: `travelled += d * v * DT`, `rem = target - travelled`. While `rem > BRAKE_TAU * |v| + 0.005`: `uL = uR = d * CRUISE_DUTY * power`. Otherwise `uL = uR = 0` (brake). The move ends when `rem <= BRAKE_TAU * |v| + 0.005`, `|v| < 0.02` and `|w| < 0.05`. If the robot is blocked and stalled, it keeps pushing until the timeout or battery ends the run.
+- **Turn**: `turned += d * w * DT`, `rem = target - turned`. While `rem > TURN_BRAKE_TAU * |w| + 0.01`: `uL = -d * td`, `uR = d * td`, where `td = TURN_SLOW_DUTY * power` if `rem < TURN_SLOW_ZONE` and `TURN_DUTY * power` otherwise. Otherwise brake (`u = 0`). Moves and turns latch into braking: once braking starts it continues until the command ends. Ends when braking and `|w| < 0.05` and `|v| < 0.02`.
 - **Wait**: `u = 0` until `N` seconds pass.
+- **Bump drive** (new): `elapsed += DT`. While not braking: if `bumper` (from the previous step's contact) then start braking; else if `elapsed >= UNTIL_BUMP_TIMEOUT` record `bump_timeout {t, line}` and start braking; else `uL = uR = CRUISE_DUTY * power`. Braking: `u = 0` until `|v| < 0.02` and `|w| < 0.05`, then the command ends. Cutting the motors on contact means `until-bump` never produces a `stall`.
+
+Spec-time measurement with emulated power (duties scaled by hand in a throwaway script): move error stays within 1.5 cm and turn error within 1.5 degrees at every power from 10 to 100; time grows roughly as 1 / power (`forward 300`: 5.3 s at 100, 48.5 s at 10). With the old fixed 0.2 stall threshold no stall was detected at power 20 or below, which is why the threshold scales with power.
 
 When the stack empties, `programDone = true`. The run ends as FAIL (`program_ended`) once `programDone` and `|v| < 0.02` and no goal was reached. `forward 0` and `wait 0` end in one step.
 
@@ -117,14 +131,15 @@ Grammar (case-insensitive, whitespace and newlines are separators, `;` starts a 
 
 ```
 program  := { command }
-command  := ("forward"|"back"|"left"|"right"|"wait") NUMBER
+command  := ("forward"|"back"|"left"|"right"|"wait"|"power") NUMBER
+          | "until-bump"
           | "repeat" NUMBER block
-          | "if" "wall-ahead" block
+          | "if" ("wall-ahead" | "bumped") block
 block    := "[" { command } "]"
 NUMBER   := digits [ "." digits ]
 ```
 
-Limits (`LIMITS`): move distance 0 to 1000 cm; turn 0 to 3600 degrees; repeat count 1 to 100; wait 0 to 60 s; nesting depth at most 8; program text at most 5000 characters; at most 2000 commands after expanding all repeats (counted with saturation, so the check itself cannot overflow or hang).
+Limits (`LIMITS`): move distance 0 to 1000 cm; turn 0 to 3600 degrees; repeat count 1 to 100; wait 0 to 60 s; power 10 to 100 (`MIN_POWER`, `MAX_POWER`; decimals allowed); `power` and `until-bump` each count as 1 command; nesting depth at most 8; program text at most 5000 characters; at most 2000 commands after expanding all repeats (counted with saturation, so the check itself cannot overflow or hang).
 
 The tokenizer records the line of each token. The parser is a hand-written recursive descent with an explicit depth counter. It runs inside a `try/catch` as a last resort that returns an internal-error result, but it is written so the catch should never trigger.
 
@@ -137,6 +152,11 @@ Error messages (plain language, with the line number):
 - `Line 1: 5000 is too big for "forward". The most is 1000.`
 - `Line 7: Blocks are nested too deeply (limit 8).`
 - `Nothing to run. Type a command like forward 50.` (reported with `line: 0`)
+- New: `Line 2: "power" needs a number from 10 to 100, like power 50.` (missing number), `Line 2: 150 is too big for "power". The most is 100.`, `Line 2: "power" must be at least 10, but I found 5.`
+- New: `Line 4: "until-bump" does not take a number. It drives until the bumper touches a wall.` (when a number follows it)
+- Changed wording for `if` without a condition: `"if" needs a condition: wall-ahead or bumped, like: if wall-ahead [ left 90 ]`. It still contains "wall-ahead", which the existing test checks.
+- `power` and `until-bump` join the "did you mean" keyword list. Existing suggestions are unchanged (checked: `lft`, `fowrard`, `repeet` keep their suggestions; `banana` still gets none).
+- With `{ positions: true }`, `power` nodes get `start`, `numStart`, `numEnd`, and `until-bump` / `if bumped` nodes get `start`.
 
 ## 7. Levels (`levels.js`)
 
@@ -161,16 +181,62 @@ Level 3 turns on slick floor, so required wheel force exceeds the friction limit
 ```
 `levels.js` exports `LEVELS` (array of 3 definitions), `getLevel(id)` (returns the built level, or level 1 for an unknown id), and `buildLevel`.
 
+### 7b. Chapters, layouts and new levels (R11)
+
+Compatibility: `LEVELS` stays exactly the 3 chapter 1 definitions, because existing tests check `LEVELS` has ids 1, 2, 3. New exports:
+- `ALL_LEVELS`: the 9 definitions, ids 1 to 9.
+- `CHAPTERS`: `[{ id: 1, name: 'Basics', levels: [1, 2, 3] }, { id: 2, name: 'Grip and Power', levels: [4, 5, 6] }, { id: 3, name: 'Bumpers', levels: [7, 8, 9] }]`.
+- `getLevel(id, layout)`: looks up `ALL_LEVELS` (unknown ids still give level 1); `layout` is 0, 1 or 2 and defaults to 0.
+- `buildLevel(def, layout)`: uses `def.layouts[layout].map` when `def.layouts` exists, otherwise `def.map`. The built level gains `chapter`, `layout` (`'A'`, `'B'`, `'C'` or `null`), `layoutCount` and `powerMatters`. A level with no `layouts` builds exactly as before.
+- Goal: the goal rectangle is the bounding box of all `G` cells. A test checks every cell in that box is `G`. Levels with one `G` cell get the same rectangle as before.
+- `powerMatters: true` (chapter 2 and icy challenge levels) turns on the coach's power-insert edits and adds the hint "Lower power asks the floor for less force." to the slip explanation. Other levels are untouched.
+
+Starting values below are not tuned yet. Task 26 tunes them like task 8 and records final values and changes in section 10.
+
+**Chapter 2: Grip and Power.** `o` cells here are ice (`slickMu` around 0.08). Spec-time experiment (duties scaled by hand, capacity 50 C so only the physics shows): on a long icy hairpin with friction 0.08, power 100 hit a wall and needed 85.8 s and 13.2 C; power 80 took 27.4 s and 2.44 C; power 70 took 26.4 s and 1.13 C; power 60 took 29.8 s and 0.96 C; power 50 took 35.0 s. Short icy maps (one or two corners) passed at every power, so all three levels use long ice legs after a turn, where full power slides into the walls. The time limit also punishes very low power, so each level has a power window.
+
+| id | Name | Map (rows top to bottom) | Ice mu | Battery | Time | Reference |
+|---|---|---|---|---|---|---|
+| 4 | Ice Hairpin | `############` / `#Sooooooooo#` / `##########o#` / `#Gooooooooo#` / `############` | 0.08 | 2.5 C | 40 s | `power 70` `forward 450` `right 90` `forward 100` `right 90` `forward 450` |
+| 5 | Frozen Switchback | `#############` / `#Soooooooooo#` / `###########o#` / `#ooooooooooo#` / `#o###########` / `#ooooooooooG#` / `#############` | 0.08 | 4 C | 75 s | `power 70` `forward 500` `right 90` `forward 100` `right 90` `forward 500` `left 90` `forward 100` `left 90` `forward 500` |
+| 6 | Black Ice | `##############` / `#S.....#######` / then 6 rows of `######o#######` / `######......G#` / `##############` | 0.08 | 3 C | 30 s | `forward 250` `right 90` `power 60` `forward 350` `power 100` `left 90` `forward 300` |
+
+Level 6 mixes normal floor and ice. It is meant to need power changes in the middle of the program: full power everywhere crashes on the ice, and low power everywhere runs out of time. Task 26 checks both.
+
+**Chapter 3: Bumpers.** Each level has layouts A, B and C with the same size, start and heading (east). A run passes only if all three pass.
+
+| id | Name | Layout differences | Battery | Time | Reference |
+|---|---|---|---|---|---|
+| 7 | Dark Corridor | corridor of 3, 5 or 7 cells, goal in the cell below its end | 3 C | 20 s | `until-bump` `back 15` `right 90` `forward 50` |
+| 8 | Long Hall | east leg 4, 6 or 3 cells, then south leg 2, 3 or 4 cells, goal east of the bottom | 3 C | 35 s | `until-bump` `back 15` `right 90` `until-bump` `back 15` `left 90` `forward 50` |
+| 9 | Find the Door | corridor of 8 cells; the door in its south wall is at column 3, 5 or 8; a room below with a goal row along its floor | 3 C | 45 s | `right 90` `repeat 8 [ if wall-ahead [ left 90 forward 50 right 90 ] ]` `until-bump` |
+
+`back 15` works because the bumper stops the robot with its centre `BODY_R` (0.10 m) from the wall, and the last cell's centre is 0.25 m from the wall.
+
+Level 7 maps (width 10, height 4; rows 0 and 3 are all `#`):
+- A: `#S...#####` / `####G#####`
+- B: `#S.....###` / `######G###`
+- C: `#S.......#` / `########G#`
+
+Level 8 maps (width 10, height 7; unlisted rows are all `#`):
+- A: row 1 `#S....####`, row 2 `#####.####`, row 3 `#####.G###`
+- B: row 1 `#S......##`, rows 2 and 3 `#######.##`, row 4 `#######.G#`
+- C: row 1 `#S...#####`, rows 2 to 4 `####.#####`, row 5 `####.G####`
+
+Level 9 maps (width 10, height 6): row 0 `##########`, row 1 `#S.......#`, row 2 the door row (A `###.######`, B `#####.####`, C `########.#`), row 3 `#........#`, row 4 `#GGGGGGGG#`, row 5 `##########`.
+
+Why a fixed program fails: the layout A program `forward 150` `right 90` `forward 50` (level 7) turns 2 cells too early on layout B and drives into the wall below the corridor. Task 26 adds that as a test for each chapter 3 level.
+
 ## 8. Module interfaces
 
 ### lang.js
-- `parse(text, options) -> { ok, program, errors }`. With `options.positions === true`, every command node also gets `start` (character offset of its keyword) and, for nodes with a number, `numStart` and `numEnd` (offsets of the number token, end exclusive). Without the option the node shape is unchanged. The coach uses these offsets to edit the source text in place. `program` is an array of nodes: `{type:'forward'|'back'|'left'|'right'|'wait', n, line}`, `{type:'repeat', n, body, line}`, `{type:'if', cond:'wall-ahead', body, line}`. `errors` is an array of `{line, message}` (at most 5). Never throws.
+- `parse(text, options) -> { ok, program, errors }`. With `options.positions === true`, every command node also gets `start` (character offset of its keyword) and, for nodes with a number, `numStart` and `numEnd` (offsets of the number token, end exclusive). Without the option the node shape is unchanged. The coach uses these offsets to edit the source text in place. `program` is an array of nodes: `{type:'forward'|'back'|'left'|'right'|'wait', n, line}`, `{type:'repeat', n, body, line}`, `{type:'if', cond:'wall-ahead'|'bumped', body, line}`, and new `{type:'power', n, line}` and `{type:'until-bump', line}`. `errors` is an array of `{line, message}` (at most 5). Never throws.
 - `LIMITS`, `countCommands(program)`.
 
 ### sim.js
 - `createSim(level, program) -> sim`.
 - `sim.step()` advances one step of `DT`. Does nothing after the run ends.
-- `sim.state`: `{t, x, y, theta, v, w, wL, wR, uL, uR, charge, soc, Vt, Voc, current, draw, slipL, slipR, contact, sensor, programDone}`.
+- `sim.state`: `{t, x, y, theta, v, w, wL, wR, uL, uR, charge, soc, Vt, Voc, current, draw, slipL, slipR, contact, sensor, programDone}`, plus new `power` (0.1 to 1), `bumper` (boolean) and `bumped` (the latched flag). The golden-run comparison (section 12) ignores these three new keys and compares every original key exactly.
 - `sim.events`: array of `{type, t, ...}`:
   - `collision {speed}`
   - `stall {duration, current, duty}` (created when the stall reaches 0.5 s; `duration` and `current` keep updating while it lasts, so the current falls as the battery sags)
@@ -179,13 +245,17 @@ Level 3 turns on slick floor, so required wheel force exceeds the friction limit
   - `timeout {limit, distance_to_goal}` (`distance_to_goal` is the straight-line distance in meters from the robot center to the goal-zone center; the same for `program_ended`)
   - `goal {}`
   - `program_ended {distance_to_goal}`
+  - new: `bump_timeout {line, elapsed}` (an `until-bump` drove `UNTIL_BUMP_TIMEOUT` without the bumper being pressed; the program continues)
 - `sim.result`: `{status:'running'|'pass'|'fail', reason:null|'goal'|'timeout'|'battery_flat'|'program_ended'}`.
 - `sim.sensorDistance()`, `sim.wallAhead()`.
 - `runToEnd(level, program, maxSteps) -> sim` for tests and the reference-solution check.
 - `C` (constants), `noLoadSpeed()`.
 
 ### levels.js
-`LEVELS`, `buildLevel`, `getLevel` as in section 7.
+`LEVELS`, `buildLevel`, `getLevel` as in section 7, plus `ALL_LEVELS`, `CHAPTERS` and the `layout` argument from section 7b.
+
+### gen.js
+See section 13. Exports `generate(seed)`, `SEED_MIN` (1), `SEED_MAX` (150), `difficulty(seed)`, `makeRng(seed)`.
 
 ### telemetry.js
 - `createTelemetry(max = 1200) -> tel`.
@@ -196,6 +266,8 @@ Level 3 turns on slick floor, so required wheel force exceeds the friction limit
 ### explain.js
 - `explain(snapshot) -> { verdict:'PASS'|'FAIL', title, causes:[{type, t, text, root}], summary }`, where `snapshot = {result, events, state, level}`. Text is built from event fields only. Rule order: earliest event first; the earliest cause is marked `root: true`. Example text: `The robot stalled against a wall for 1.2 s, drawing 0.74 A. A stalled motor draws its maximum current and wastes battery.`
 - If there are no cause events and the result is fail: `The program finished 0.62 m short of the goal.`
+- New cause `bump_timeout` (title "Bumper never touched"): `until-bump on line 3 drove for 15.0 s without touching a wall, so the program went on to the next command.`
+- New: when `snapshot.level.powerMatters` is true, the slip text gets one more sentence: `Lower power asks the floor for less force.` Every other existing text stays byte-identical.
 
 ### coach.js
 See section 11. Exports `coach`, `createSearch`, `generateEdits`, `applyEdits`, `LIMITS` (`CANDIDATE_CAP`, `SCALE_FACTORS`, `TURN_DELTAS`, `WAITS`, `MAX_EDITS`).
@@ -207,6 +279,7 @@ See section 11. Exports `coach`, `createSearch`, `generateEdits`, `applyEdits`, 
 ## 9. Test plan summary
 - Unit tests: parser accept/reject cases and messages; motor equations at known points (stall current `Vt / MOTOR_R`, zero torque at no-load); battery sag; slip threshold; collision; sensor; each level's reference program passes; explain text for each cause.
 - Property tests (seeded PRNG, 200 to 1000 cases each): parser never throws on random text; battery charge never increases; simulation is deterministic; speed never exceeds `V_NL`; robot never ends inside a wall; no NaN in state; telemetry never exceeds 1200 samples.
+- Added with R9 to R13: golden-run compatibility (section 12); power and bumper unit and property tests; level structure and tuning tests for all 9 levels and their layouts; generator property tests over all 150 seeds; coach on 10 generated levels. Target: the whole suite stays under about 30 s.
 
 ## 10. Tuning log (task 8)
 
@@ -231,6 +304,7 @@ Known physical limits of the model:
 - Cruising draws about 0.03 A in total, while both motors stalled against a wall draw about 0.84 A, so the battery drains about 25 times faster against a wall than while cruising. Cruise current is low because there is little drag and no rolling resistance.
 - `J_WHEEL` (0.0005 kg m^2) is about 20 times the inertia of a real 3 cm wheel. It is kept because a realistic value gives a wheel time constant (about 0.004 s) shorter than the 1/60 s step, which makes the explicit integration unstable. As a result, a slipping wheel spins up slowly and only runs a few cm/s ahead of the ground. Slip mainly shows up as acceleration limited by friction, not as a visibly spinning wheel.
 - Ignoring wheel inertia while gripping means the slip threshold is a little lower than a real robot's.
+- At the original slick friction (0.25), slip barely changes outcomes, because braking from cruise needs about the same distance with or without slip (0.079 m planned, 0.076 m friction-limited). That is why chapter 2 uses ice (about 0.08) and long legs after turns. Task 26 adds its tuning rows here.
 
 ## 11. Auto-Fix Coach (`coach.js`)
 
@@ -293,3 +367,60 @@ When nothing passes: `Tried 3000 small changes to distances, turn angles and wai
 ### UI
 
 After a FAIL, the "Why did it fail?" panel shows a "SUGGEST A FIX" button. Pressing it locks the editor, runs the search a little each frame, and shows `Trying changes... 400 / 3000`. The result replaces the button: the edits, the explanation, and an "APPLY FIX" button that puts the edited program in the editor (edited lines highlighted in the gutter) without running it. Reset cancels the search. The button label and help text describe what the coach does ("tries small changes to your numbers and simulates each one") and never use the words AI, language model or machine learning.
+
+### Power edits and layouts (added with R9 to R11)
+
+Power edits, with sizes on the same scale as the other edits:
+- `power-change` (always available): for each existing `power N` node, set it to each value in `POWER_VALUES` = 30, 40, 50, 60, 70, 80, 90, 100, skipping `N`. `size = |N' - N| / 100`.
+- `power-insert` (only when `level.powerMatters` is true): insert `power P ` before any `forward`, `back`, `left`, `right` or `until-bump`, on the same line, for `P` in `POWER_INSERTS` = 60, 80. `size = (100 - P) / 100` (0.4 or 0.2). The edit text says it applies "from line N on", because power stays set.
+
+`until-bump` and `if bumped` have no numbers, so they get no edits of their own.
+
+`generateEdits(text, options)`: `options.powerInsert` turns on power inserts; `createSearch` passes `powerInsert: level.powerMatters === true`. Called without options, `generateEdits(text)` returns exactly today's list for programs without `power` (the existing test that expects 21 edits for `forward 50 / left 90` stays as it is).
+
+Layouts: `createSearch(levelOrLevels, text)` also accepts an array of built levels (the 3 layouts of a chapter 3 level). A candidate passes only if it passes every layout. For ranking it uses the largest finish time and the largest charge used across layouts. "Closest" for an honest failure uses each candidate's worst layout distance. The explanation quotes the first failing layout of the original run and prefixes its lines with the layout, for example `Before (layout B): ...`. A single level behaves exactly as today. A search over 3 layouts costs about 3 times as much per candidate; the 3000-candidate cap is unchanged.
+
+Compatibility: chapter 1 levels have `powerMatters` false and one layout, so the coach produces byte-identical results there. Task 23 checks this against the recorded coach outputs in the golden fixture (section 12).
+
+## 12. Compatibility check (golden runs)
+
+The first step of task 19, before `lang.js` or `sim.js` change, is to write `scripts/record-golden.js` and record `tests/fixtures/golden-runs.json` with today's code:
+- every chapter 1 reference program and the careless programs from `tests/tuning.test.js`, on their levels;
+- 150 random valid programs from the generator in `tests/sim.property.test.js` (fixed seed 300000) on levels 1 to 3;
+- the `coach()` result for 20 failing programs on levels 1 to 3.
+
+For each run it stores the level id, the program text, the result, the event log and the final state (original keys only). `tests/compat.test.js` re-runs everything with the new code and requires `JSON.stringify` equality. The fixture is committed and never regenerated after the change. If a later task needs it regenerated, that is a behavior change and must be raised with the user.
+
+## 13. Challenge Mode generator (`gen.js`)
+
+`generate(seed)` returns a level definition in the same shape as `ALL_LEVELS` entries: `{ id: 1000 + seed, seed, name: 'Challenge ' + seed, chapter: 'challenge', hint, map, capacity, timeLimit, slickMu, powerMatters, reference, attempts, fallback }`. It never throws. A seed that is not a whole number from 1 to 150 is rounded and clamped, and `NaN` becomes 1.
+
+Randomness: `makeRng(seed)` is mulberry32, written inside `gen.js` (the copy in `tests/helpers.js` is for tests only). No `Math.random`, no clock.
+
+`difficulty(seed)`:
+- `turns = min(10, 1 + floor((seed - 1) / 15))`: seeds 1 to 15 have 1 turn; seeds 136 to 150 have 10.
+- segment length 2 to 5 cells (2 to 4 when `turns >= 7`, so long paths still fit).
+- slick chance per segment after the first: 0 below seed 31, then `min(0.5, (seed - 30) / 120)`.
+- floor type of slick segments: friction 0.25 for seeds 31 to 90, ice (0.08) from seed 91.
+
+Path: the grid is at most 15 by 11 cells including the border wall. The start is a floor cell heading east. Each segment picks a length and, after the first, a left or right turn. A segment is accepted only if every new cell is inside the border and is not next to (4-neighbour) any earlier path cell except the cell it continues from, so corridors are always separated by a wall. Up to 50 tries per segment, then the attempt restarts. The last cell of the path is `G`. Every other cell is `#`.
+
+Reference program, derived from the same path: for each segment, `forward (length * 50)`, then `right 90` or `left 90` before the next segment. On ice levels, `power 60` comes before the first command of an ice segment and `power 100` before the first command of the next normal segment; `powerMatters` is true.
+
+Budget, by simulation:
+1. Run the reference with capacity 1000 C and time limit 1000 s, which gives time `T` and charge `U`.
+2. `capacity = max(0.5, ceil(U / 0.65 / 0.05) * 0.05)` and `timeLimit = max(10, ceil(T / 0.65))`.
+3. Re-run with those values. Accept if it passes with `t <= 0.75 * timeLimit` and `used <= 0.75 * capacity`. Otherwise multiply both by 1.1 and repeat, at most 8 times. (A smaller battery sags sooner and slows the robot, so step 3 is needed.)
+4. If it still fails, start a new attempt with sub-seed `seed * 100 + attempt`, at most 20 attempts. As a last resort return a fixed 4-cell straight corridor with `fallback: true`. A test requires `fallback === false` for all 150 seeds.
+
+`hint` text, for example `Seed 97: 7 turns, 2 icy patches. Lower power on ice.`
+
+## 14. UI additions (R13)
+
+- **Level picker:** one `<select>` with `<optgroup>` labels "Chapter 1: Basics", "Chapter 2: Grip and Power", "Chapter 3: Bumpers" and "Challenge". The "Challenge" group has one entry, "Challenge mode". Choosing it shows a seed row: `SEED [17] PREV NEXT` with a number field limited to 1 to 150. PREV and NEXT are text buttons. Changing the seed builds `gen.generate(seed)` and loads it. The arena header shows `Challenge 17 (seed 17)` and the hint line shows the generator's hint.
+- **Layouts:** on chapter 3 levels the visible run uses layout A. When it ends, layouts B and C run at once with `runToEnd`; today a level run takes 0.6 to 1.3 ms in Node, so this is instant. A row of chips under the status line shows `LAYOUTS  A PASS  B FAIL  C PASS`, using text labels as well as colour. Clicking a chip replays that layout visibly. The run passes only if all chips pass. The status line and the panel name the first failing layout, for example `FAIL: layout B: Stalled against a wall (root cause, at 4.2 s).`
+- **Readout:** add `power 60%` and, while pressed, `BUMPER`.
+- **Robot drawing:** a front bumper arc in front of the shell, drawn amber while pressed.
+- **Help:** add `power 60  ; percent, 10 to 100`, `until-bump`, and `if bumped [ ... ]`.
+- **Arena sizing:** `arenaHeight` and `fitTransform` already handle any map size. Challenge maps are at most 15 by 11 cells.
+- **Out of scope:** 3D, sound, accounts, saving of progress.

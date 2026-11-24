@@ -25,7 +25,10 @@ The required export line is `if (typeof module !== 'undefined') module.exports =
 ## Simulation rules
 - Fixed-timestep, deterministic simulation at 60 Hz (`DT = 1/60` s). Rendering speed never changes `DT`. A speed control changes how many steps run per frame.
 - The same level and program always give identical results. No `Math.random`, no `Date.now`, no wall-clock reads inside simulation code. If randomness is ever needed, use a seeded PRNG.
-- Simulation code (`lang.js`, `sim.js`, `levels.js`, `telemetry.js`, `explain.js`) has no DOM access: no `document`, `window`, `canvas`, or `requestAnimationFrame`. Only `ui.js` touches the DOM.
+- Simulation code (`lang.js`, `sim.js`, `levels.js`, `telemetry.js`, `explain.js`, `coach.js`, `gen.js`) has no DOM access: no `document`, `window`, `canvas`, or `requestAnimationFrame`. Only `ui.js` touches the DOM.
+- Script order in `index.html`: `lang.js`, `levels.js`, `sim.js`, `telemetry.js`, `explain.js`, `coach.js`, `gen.js`, `ui.js`.
+- `gen.js` uses its own seeded PRNG (mulberry32). The same seed always gives the same level.
+- Compatibility: `tests/fixtures/golden-runs.json` records today's behavior. It must keep passing, and it is never regenerated without the user agreeing to a behavior change.
 - Parsers and simulation functions never throw on any input. They return error objects.
 
 ## Testing

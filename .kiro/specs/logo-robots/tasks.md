@@ -28,7 +28,7 @@ Build in this order. Each task is small, ends with a passing `node --test tests/
 
 - [x] 13. **Telemetry graph and "Why did it fail?" panel.** Graph canvas with reserved margins for axes and legend (speed green, current amber, battery dashed), cleared on Reset; panel with PASS/FAIL result and the explain text; amber and red styling with text labels. _Requirements: 4.2, 4.3, 4.4, 5.1 to 5.8_
 
-- [ ] 14. **Final check and README.** Do this last, after tasks 15 to 18. Manual walkthrough of all 3 levels by double-clicking `index.html` in a current browser (pass each with its reference program; trigger stall, battery flat, slip, timeout and see the panel; ask the coach for a fix on a failing run and apply it); check no text overlaps graphics; confirm no DOM use outside `ui.js` with a grep test; finish `README.md`. _Requirements: 7.1 to 7.3, 8.14, 8.15_
+- [ ] 14. **Final check and README.** Do this last, after tasks 15 to 32. Also walk through one level per chapter and three challenge seeds (1, 75, 150). Manual walkthrough of all 3 levels by double-clicking `index.html` in a current browser (pass each with its reference program; trigger stall, battery flat, slip, timeout and see the panel; ask the coach for a fix on a failing run and apply it); check no text overlaps graphics; confirm no DOM use outside `ui.js` with a grep test; finish `README.md`. _Requirements: 7.1 to 7.3, 8.14, 8.15_
 
 ## Auto-Fix Coach (added after the first 14 tasks)
 
@@ -39,3 +39,68 @@ Build in this order. Each task is small, ends with a passing `node --test tests/
 - [x] 17. **Coach property tests.** For random failing programs on random levels: (a) `coach` is deterministic (same `JSON.stringify` twice); (b) `createSearch` stepped in random chunk sizes gives the same result as `coach`; (c) when `found`, the returned program parses, passes when re-simulated with `runToEnd`, equals `applyEdits(original, edits)`, and has 1 or 2 edits; (d) `tried <= 3000`; (e) every edited value stays within the language limits; (f) `coach` never throws on random text, random levels or missing arguments. Keep case counts low enough that the suite stays under about 30 s. _Requirements: 8.4 to 8.6, 8.11, 8.13_
 
 - [x] 18. **Coach UI.** "SUGGEST A FIX" button in the failure panel after a FAIL; search spread over frames (about 12 ms per frame) with a progress line; result with edits, explanation and "APPLY FIX" (puts the program in the editor, highlights edited lines, does not run it); Reset cancels. A test greps `coach.js`, `ui.js`, `index.html` and `README.md` for "AI", "language model" and "machine learning" and expects none. _Requirements: 8.14, 8.15_
+
+
+## Power, bumper, chapters and Challenge Mode (14 tasks, in this order)
+
+Rule for every task below: all existing tests stay green, and `tests/compat.test.js` (task 19) must pass after each task.
+
+### Language and physics
+
+- [ ] 19. **Golden runs, then the parser.** First, with today's code, write `scripts/record-golden.js` and commit `tests/fixtures/golden-runs.json` plus `tests/compat.test.js` (design section 12). Then add `power N`, `until-bump` and `if bumped` to `lang.js`: limits, messages, keyword suggestions, `countCommands`, positions. _Requirements: 9.1, 9.5, 10.2, 10.6, 1.10_
+
+- [ ] 20. **Parser tests for the new commands.** Unit: each new command parses with its line; `power` at 10, 100, 9.9 and 100.5; a missing number; `until-bump 5` gives its own message; `if bumped` with and without a block; nesting; positions for the new nodes; the old suggestions are unchanged. Property: the existing parser properties re-run with a generator that also emits the new commands (never throws, valid shape, `countCommands` matches, deterministic). _Requirements: 9.5, 1.10, 1.11_
+
+- [ ] 21. **Simulation: power and bumper.** In `sim.js`: `power` state and scaled duties, the stall threshold `STALL_DUTY * power`, the bumper, the bumped flag, `if bumped`, the bump drive with `UNTIL_BUMP_TIMEOUT` and the `bump_timeout` event. New state keys `power`, `bumper`, `bumped`. _Requirements: 9.1 to 9.4, 10.1 to 10.7, 2.11_
+
+- [ ] 22. **Simulation tests for power and bumper.** Unit:
+  - The required slip test: floor friction 0.25, `forward 100` at power 100 records slip events, and `power 50` then `forward 100` records none.
+  - Move error within 1.5 cm and turn error within 3 degrees at power 10, 30, 50, 70 and 100.
+  - A stall is detected at power 20 (it was not with the old threshold).
+  - `until-bump` stops with the centre 0.10 m (plus or minus 1 cm) from a wall ahead, ends at once when already touching, records no `stall`, and after 15 s in open space records `bump_timeout` and moves on.
+  - A side wall does not press the bumper.
+  - `if bumped` is true once after a contact, then false.
+  - `power 100` gives runs identical to having no `power` command.
+
+  Property: the task 9 invariants (charge, speed, walls, NaN, termination, determinism) on random programs that include the new commands; `until-bump` never lasts more than 15 s plus settling. _Requirements: 9.2 to 9.6, 10.1 to 10.7, 2.2_
+
+- [ ] 23. **Explain and coach for power, bumper and layouts.** The `bump_timeout` cause; the slip hint on `powerMatters` levels; the coach's `power-change` and gated `power-insert` edits; `createSearch` accepting several layouts. Unit tests: exact power edits for a known program; no power inserts without `powerMatters`; a known fix on an ice test level that inserts `power 60` or `power 80`; a layout search that rejects a fix passing only layout A; the coach golden results are byte-identical. _Requirements: 9.7, 8.2, 8.16, 10.8_
+
+### Handpicked levels
+
+- [ ] 24. **Chapters and layouts in `levels.js`.** `ALL_LEVELS`, `CHAPTERS`, `getLevel(id, layout)`, `buildLevel(def, layout)`, the multi-cell goal rectangle, `powerMatters`, and the 6 new level definitions with the starting values from design section 7b. `LEVELS` stays the 3 chapter 1 levels. _Requirements: 11.1, 11.2, 11.5, 11.6_
+
+- [ ] 25. **Level structure tests.** Every map in every layout is rectangular and closed, with one `S` and a fully filled `G` rectangle; all 3 layouts of a level have the same size and start; chapter grouping and ids; levels 1 to 3 build byte-identical to before; unknown ids still give level 1. _Requirements: 11.1, 11.5, 11.6, 3.2_
+
+- [ ] 26. **Tune chapters 2 and 3, and the level tests.** Tune friction, battery and time like task 8, and record every change (old value, new value, reason) in design section 10. Tests:
+  - Every reference passes every layout using at most 75 percent of time and battery.
+  - Chapter 2: removing all `power` commands makes the reference fail.
+  - Chapter 2: the reference still passes at slick friction times 0.9 and 1.1.
+  - Level 6: power 60 everywhere fails on time.
+  - Chapter 3: the reference uses `until-bump`, and a fixed-distance program measured on layout A fails at least one other layout.
+
+  If a level cannot meet these, stop and report it rather than loosening a test. _Requirements: 11.2 to 11.5_
+
+### Challenge Mode
+
+- [ ] 27. **Generator `gen.js`.** `makeRng`, `difficulty`, path building with wall separation, map, reference from the same path, ice power commands, the budget from simulation with the margin loop, deterministic retries and the fallback (design section 13). Add `gen.js` to `index.html` before `ui.js`. _Requirements: 12.1 to 12.5, 12.8_
+
+- [ ] 28. **Generator property tests.** For all 150 seeds:
+  - The reference passes with at least 25 percent margin in time and charge.
+  - `fallback` is false.
+  - `generate` is deterministic (same JSON twice).
+  - The map is closed, at most 15 by 11 cells, with corridors separated by walls.
+  - Turns never decrease as the seed rises; no slick floor below seed 31; no ice below seed 91.
+  - Odd seeds (0, -5, 151, 2.5, NaN, a string) never throw and are clamped.
+
+  Also check that generating all 150 seeds takes under 10 s. _Requirements: 12.2 to 12.6, 12.8_
+
+- [ ] 29. **Coach on generated levels.** For seeds 5, 20, 35, 50, 65, 80, 95, 110, 125 and 140, break the reference by halving its last `forward`. The coach must return a fix that parses, passes and uses at most 2 edits, and the search must stay within 3000 candidates. Record the run time; the target is under 15 s for the whole test. _Requirements: 12.7, 8.4_
+
+### UI
+
+- [ ] 30. **Level picker and challenge seed picker.** Chapter optgroups; "Challenge mode" with the seed row (number field 1 to 150, PREV, NEXT); the header shows `Challenge N (seed N)`; the hint line; command help for the new commands; the readout shows power and the bumper. Pure helpers (option list from `CHAPTERS`, seed clamping, header text) get unit tests in `tests/ui.test.js`. _Requirements: 13.1, 13.2, 13.4, 9.8_
+
+- [ ] 31. **Layout chips and bumper drawing.** Run layout A visibly, then B and C instantly; chips with PASS or FAIL text; replay on click; the status line and the panel name the first failing layout; the coach button uses all layouts; the bumper arc turns amber while pressed. A pure helper that combines per-layout results gets unit tests. _Requirements: 11.5, 13.3, 8.16_
+
+- [ ] 32. **Browser check.** Extend `scripts/e2e-coach.js` (or add `scripts/e2e-levels.js`) to load one level per chapter and challenge seeds 1, 75 and 150. It runs each reference, clicks a failing layout chip, and checks there are no page errors. Take screenshots and check that no text overlaps graphics. The "no AI wording" test also covers `gen.js`. _Requirements: 13.1 to 13.5, 7.1_

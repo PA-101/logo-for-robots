@@ -21,3 +21,7 @@ Retro phosphor-green terminal on a near-black background.
 - Layout is desktop only: editor and controls on the left, arena in the middle, telemetry and the "Why did it fail?" panel on the right or below.
 - Optional subtle scanline effect must be off the text areas and must not reduce readability. No flicker animation.
 - Telemetry colors: speed green, motor current amber, battery level dim-green dashed. Each line has a text legend.
+- Ice is drawn like slick floor but with a lighter hatch, and the legend says "ice". The front bumper is an arc drawn amber while pressed.
+- The level picker groups levels under chapter headings. The Challenge seed row uses text buttons (PREV, NEXT) and always shows the seed number.
+- Layout results are chips with text (`A PASS`, `B FAIL`), not color alone.
+- 2D only. No 3D, no sound.
