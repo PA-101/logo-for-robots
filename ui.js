@@ -97,6 +97,21 @@
     return { visible: true, heading: 'WHY DID IT FAIL?', kind: 'fail', line: causes.length ? '' : String(exp.summary || ''), causes: causes, showCoach: true };
   }
 
+  // Combines per-layout results: the run passes only if every layout passes. "focus" is the
+  // first failing layout (the one the panel explains), or the visible one when all pass.
+  function combineLayouts(names, results, visible) {
+    var list = Array.isArray(results) ? results : [];
+    var v = typeof visible === 'number' && visible >= 0 && visible < list.length ? visible : 0;
+    var chips = list.map(function (r, i) {
+      var name = (names && names[i]) || String.fromCharCode(65 + i);
+      var pass = !!(r && r.status === 'pass');
+      return { index: i, name: name, pass: pass, text: name + ' ' + (pass ? 'PASS' : 'FAIL'), shown: i === v };
+    });
+    var firstFail = -1;
+    for (var i = 0; i < chips.length; i++) if (!chips[i].pass) { firstFail = i; break; }
+    return { multi: chips.length > 1, pass: chips.length > 0 && firstFail < 0, focus: firstFail < 0 ? v : firstFail, chips: chips };
+  }
+
   // ---- level picker helpers (pure) -------------------------------------
   var CHALLENGE_VALUE = 'challenge';
 
@@ -156,6 +171,7 @@
     statusLine: statusLine,
     resultView: resultView,
     levelOptions: levelOptions,
+    combineLayouts: combineLayouts,
     parseLevelKey: parseLevelKey,
     headerText: headerText,
     CHALLENGE_VALUE: CHALLENGE_VALUE,
@@ -294,6 +310,7 @@
       el.level.value = String(app.level.id);
     }
     app.levelId = app.level.id;
+    app.visibleLayout = 0;
     el.seedRow.hidden = key.kind !== 'challenge';
     el.levelTitle.textContent = headerText(app.level);
     el.hint.textContent = app.level.hint || '';
@@ -313,6 +330,7 @@
     app.skids = [];
     app.slipSeen = [-1e9, -1e9];
     app.coach = null;                       // Reset cancels a coach search in progress
+    if (el.chips) renderChips(null);
     lockEditor(false);
     setStatus('', 'READY. Press RUN.');
     renderWhy(null);
@@ -320,8 +338,13 @@
     draw();
   }
 
-  function run() {
+  // Runs the editor program. On levels with layouts, layoutIndex picks the layout shown in the
+  // arena (A by default); the other layouts are simulated instantly when the run ends.
+  function run(layoutIndex) {
     if (app.running || coachBusy()) return false;
+    var li = typeof layoutIndex === 'number' && app.layouts && app.layouts[layoutIndex] ? layoutIndex : 0;
+    app.visibleLayout = li;
+    if (app.layouts && app.layouts[li]) app.level = app.layouts[li];
     var parsed = L.lang.parse(el.code.value);
     if (!parsed.ok) {
       showErrors(parsed.errors);
@@ -332,6 +355,7 @@
     showMessage(count + (count === 1 ? ' command' : ' commands') + ' ready.');
     reset();
     app.lastRunText = el.code.value;        // the coach fixes the program that actually ran
+    app.lastProgram = parsed.program;
     app.sim = L.sim.createSim(app.level, parsed.program);
     app.tel.record(app.sim.state, 0);
     app.running = true;
@@ -371,12 +395,42 @@
     app.running = false;
     app.ended = true;
     lockEditor(false);
-    var sim = app.sim;
+    var layouts = app.layouts && app.layouts.length ? app.layouts : [app.level];
+    // The visible layout ran in the arena; the others run instantly (about 1 ms each).
+    var sims = layouts.map(function (l, i) {
+      return i === app.visibleLayout ? app.sim : L.sim.runToEnd(l, app.lastProgram);
+    });
+    var combined = combineLayouts(layouts.map(function (l) { return l.layout; }), sims.map(function (s) { return s.result; }), app.visibleLayout);
+    var sim = sims[combined.focus], level = layouts[combined.focus];
     // One explanation feeds both the status line and the panel.
-    var exp = L.explain.explain({ result: sim.result, events: sim.events, state: sim.state, level: app.level });
+    var exp = L.explain.explain({ result: sim.result, events: sim.events, state: sim.state, level: level });
     var line = statusLine(exp, L.explain.fmt);
+    if (combined.multi && !combined.pass) line.text = line.text.replace(/^FAIL: /, 'FAIL: layout ' + combined.chips[combined.focus].name + ': ');
+    if (combined.multi && combined.pass) line.text = line.text.replace(/^PASS: /, 'PASS on all ' + combined.chips.length + ' layouts: ');
     setStatus(line.kind, line.text);
-    renderWhy(sim, exp);
+    renderChips(combined);
+    app.combined = combined;
+    renderWhy(sim, exp, combined.multi && !combined.pass ? 'Layout ' + combined.chips[combined.focus].name + ':' : '');
+  }
+
+  function renderChips(combined) {
+    var box = el.chips;
+    box.textContent = '';
+    box.hidden = !combined || !combined.multi;
+    if (box.hidden) return;
+    var lab = document.createElement('span');
+    lab.className = 'label';
+    lab.textContent = 'LAYOUTS';
+    box.appendChild(lab);
+    combined.chips.forEach(function (c) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'btn small chip ' + (c.pass ? 'pass' : 'fail') + (c.shown ? ' shown' : '');
+      b.textContent = c.text;
+      b.title = 'Replay layout ' + c.name + ' in the arena';
+      b.addEventListener('click', function () { run(c.index); });
+      box.appendChild(b);
+    });
   }
 
   function setStatus(kind, text) {
@@ -590,6 +644,16 @@
       ctx.stroke();
     });
 
+    // front bumper: an arc ahead of the head, amber while pressed
+    ctx.shadowBlur = st.bumper ? 12 : 0;
+    ctx.shadowColor = COLORS.warn;
+    ctx.strokeStyle = st.bumper ? COLORS.warn : COLORS.dim;
+    ctx.lineWidth = (st.bumper ? 3 : 2) * px;
+    ctx.beginPath();
+    ctx.arc(0, 0, C.BODY_R - 1.5 * px, -Math.PI / 3, Math.PI / 3);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
     // head
     ctx.shadowColor = COLORS.fg;
     ctx.shadowBlur = 6;
@@ -764,7 +828,7 @@
   }
 
   // ---- result panel ("RESULT" on pass, "WHY DID IT FAIL?" on failure) ------
-  function renderWhy(sim, exp) {
+  function renderWhy(sim, exp, layoutNote) {
     var box = el.why;
     box.textContent = '';
     box.classList.remove('flash', 'flash-pass');
@@ -780,6 +844,12 @@
       line.textContent = view.line;
       box.appendChild(line);
     } else if (view.causes.length) {
+      if (layoutNote) {
+        var note = document.createElement('p');
+        note.className = 'layout-note';
+        note.textContent = layoutNote;
+        box.appendChild(note);
+      }
       var ol = document.createElement('ol');
       view.causes.forEach(function (c) {
         var li = document.createElement('li');
@@ -824,7 +894,9 @@
 
   function startCoach() {
     if (app.running || coachBusy() || !app.lastRunText) return;
-    app.coach = { search: L.coach.createSearch(app.level, app.lastRunText), text: app.lastRunText };
+    // Multi-layout levels: a fix must pass every layout (R8.16).
+    var target = app.layouts && app.layouts.length > 1 ? app.layouts : app.level;
+    app.coach = { search: L.coach.createSearch(target, app.lastRunText), text: app.lastRunText };
     lockEditor(true);
     renderCoachProgress();
     if (app.coach.search.done) finishCoach();   // parse errors and "nothing to change" end at once
@@ -1019,6 +1091,7 @@
     el.seed = $('seed');
     el.seedRow = $('seed-row');
     el.levelTitle = $('level-title');
+    el.chips = $('layout-chips');
 
     var opts = hashOptions();
     levelOptions(L.levels.CHAPTERS, L.levels.ALL_LEVELS).forEach(function (g) {

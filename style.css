@@ -254,3 +254,11 @@ option { color: var(--fg); }
 @media (prefers-reduced-motion: reduce) {
   .boot-cursor, .why.flash, .why.flash-pass { animation: none; }
 }
+
+/* ---- layout chips ------------------------------------------------------ */
+.chips { display: flex; align-items: center; gap: 8px; margin: 4px 0 8px; flex-wrap: wrap; }
+.chips[hidden] { display: none; }
+.chip.pass { border-color: var(--fg); }
+.chip.fail { border-color: var(--fail); color: var(--fail); text-shadow: none; }
+.chip.shown { outline: 1px dashed var(--muted); outline-offset: 2px; }
+.why .layout-note { margin: 0 0 4px; color: var(--warn); text-shadow: none; }

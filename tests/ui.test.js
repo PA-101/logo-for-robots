@@ -315,3 +315,34 @@ test('the page has the seed row with a 1 to 150 number field and PREV / NEXT but
   assert.ok(html.includes('id="seed-prev"') && html.includes('id="seed-next"'));
   assert.ok(html.includes('id="level-title"'));
 });
+
+// ---- layout chips (task 31) ------------------------------------------------------
+const { combineLayouts } = require('../ui.js');
+
+test('combineLayouts: passes only when every layout passes, and points at the first failure', () => {
+  const P = { status: 'pass' }, F = { status: 'fail' };
+  assert.deepStrictEqual(combineLayouts(['A', 'B', 'C'], [P, P, P], 0),
+    { multi: true, pass: true, focus: 0, chips: [
+      { index: 0, name: 'A', pass: true, text: 'A PASS', shown: true },
+      { index: 1, name: 'B', pass: true, text: 'B PASS', shown: false },
+      { index: 2, name: 'C', pass: true, text: 'C PASS', shown: false }] });
+  const mixed = combineLayouts(['A', 'B', 'C'], [P, F, F], 0);
+  assert.strictEqual(mixed.pass, false);
+  assert.strictEqual(mixed.focus, 1);
+  assert.deepStrictEqual(mixed.chips.map((c) => c.text), ['A PASS', 'B FAIL', 'C FAIL']);
+  assert.strictEqual(combineLayouts(['A', 'B'], [P, P], 1).focus, 1, 'all pass: focus is the shown layout');
+  const single = combineLayouts([null], [F], 0);
+  assert.strictEqual(single.multi, false);
+  assert.strictEqual(single.chips[0].name, 'A');
+  assert.strictEqual(combineLayouts([], [], 0).pass, false);
+});
+
+test('combineLayouts on real chapter 3 runs: the fixed-distance program passes A and fails B', () => {
+  const layouts = levelsMod.getLayouts(7);
+  const results = layouts.map((l) => runToEnd(l, parse('forward 150\nright 90\nforward 50').program).result);
+  const c = combineLayouts(layouts.map((l) => l.layout), results, 0);
+  assert.deepStrictEqual(c.chips.map((x) => x.text), ['A PASS', 'B FAIL', 'C FAIL']);
+  assert.strictEqual(c.focus, 1);
+  const ref = layouts.map((l) => runToEnd(l, parse(l.reference).program).result);
+  assert.strictEqual(combineLayouts(layouts.map((l) => l.layout), ref, 0).pass, true);
+});

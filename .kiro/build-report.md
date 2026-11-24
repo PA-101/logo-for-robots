@@ -51,3 +51,9 @@ Running log of the autonomous build. One entry per task: what was done, test cou
 - The level select has chapter optgroups plus "Challenge mode"; a seed row (number field 1 to 150, PREV, NEXT that wrap around) appears in Challenge mode; the arena header shows "Level N: Name" or "Challenge N (seed N)"; the readout shows power and BUMPER. Hash support: `#level=4`, `#level=c75`, `#level=challenge&seed=75`. Help was done in Part 1.
 - Fixed: the readout line ran past the panel border when slip, BUMPER and STALLED all showed; it now wraps.
 - Tests: 280 pass.
+
+## Task 31: layout chips and bumper drawing
+
+- On chapter 3 levels layout A runs in the arena, then B and C run instantly. Chips under the status line read "A PASS / B FAIL / C FAIL" (text plus colour), and clicking a chip replays that layout. The status line and the panel name the first failing layout ("FAIL: layout B: Stalled against a wall ..."). The coach searches all layouts. The robot has a front bumper arc that turns amber while pressed.
+- Tests: 282 pass.
+- Looks off: after a multi-layout failure the telemetry graph and battery gauge show the layout that ran visibly (A), while the panel explains B. Click the B chip to see B's telemetry.
