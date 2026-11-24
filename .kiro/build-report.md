@@ -110,3 +110,12 @@ Running log of the autonomous build. One entry per task: what was done, test cou
 - `.kiro/hooks/run-level-tests-on-save.json` runs the level and generator test files when `levels.js` or `gen.js` is saved, in the same v1 format as the first hook. It also runs `levels.tuning.test.js`, which is not in the spec's list but is a level test. A test checks both hooks parse, that the first hook is unchanged, that the matcher matches levels.js and gen.js but not sim.js, mylevels.js or tests/gen.test.js, and that every file the command names exists.
 - The first full run reported the new hook file as missing (the file write had not landed yet); a rerun passed. Not a code issue.
 - Tests: 308 pass.
+
+## Part 4: visual audit and fix
+
+- `scripts/audit.js` shoots 14 states at 7 size and zoom combinations (98 states) and checks each in the page: horizontal scroll, overflowing text, elements sticking out of panels, overlapping blocks, tiny or stretched canvases, text contrast below 7:1, console errors. `scripts/cdp.js` now takes full-page screenshots and reloads through about:blank, because a hash-only change did not re-run the page.
+- Before: 91 of 98 states had issues. A horizontal scrollbar in 65 (the fixed 1422 px three-column grid), and line-number contrast 3.7:1 in all.
+- Fixes: a two-column layout below 1440 px with telemetry and the result panel underneath (the wide layout and its test are unchanged); line numbers `#46b866` (7.9:1); failure text `#ff8a80` (the steering colour `#ff3b30` measured only 5.4 to 5.7:1 as text, below the steering file's own 7:1 rule; it stays for graphics, and the steering table now lists both); the arena header wraps instead of running "ARENALEVEL" together (found by eye); a hover state for the COMMANDS toggle.
+- After: 0 of 98 states with issues, no console errors. Before and after shots are in docs/screenshots/ (16 files, about 4.4 MB) with a README of findings and fixes.
+- Tests: 308 pass.
+- Not covered: native dropdown lists cannot be captured headless; the export dialog backdrop only covers the window area in full-page shots (a capture effect).

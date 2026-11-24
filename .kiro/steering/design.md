@@ -1,4 +1,4 @@
-# Visual design
+﻿# Visual design
 
 ## Look
 Retro phosphor-green terminal on a near-black background.
@@ -11,6 +11,8 @@ Retro phosphor-green terminal on a near-black background.
 | Dim text, grid, borders | `#1a7a33` |
 | Warning (low battery, slip, near limits) | `#ffb000` |
 | Failure (stall, crash, fail result) | `#ff3b30` |
+| Failure text (so red text keeps 7:1 contrast; `#ff3b30` stays for graphics and borders) | `#ff8a80` |
+| Line numbers | `#46b866` |
 | Goal zone | `#33ff66` outline with faint fill |
 
 ## Rules

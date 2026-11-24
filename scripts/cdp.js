@@ -60,8 +60,14 @@ async function launch(opts) {
     for (let t = 0; t < ms; t += 100) { if (await js(expr)) return true; await sleep(100); }
     throw new Error('timed out waiting for ' + expr);
   };
+  // Full-page screenshot (the whole scrollable page, not just the window).
   const shot = async (file) => {
-    const r = await send('Page.captureScreenshot', { format: 'png' });
+    const m = await send('Page.getLayoutMetrics');
+    const size = m.result.cssContentSize || m.result.contentSize;
+    const r = await send('Page.captureScreenshot', {
+      format: 'png', captureBeyondViewport: true,
+      clip: { x: 0, y: 0, width: Math.ceil(size.width), height: Math.ceil(size.height), scale: 1 }
+    });
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, Buffer.from(r.result.data, 'base64'));
   };
@@ -73,6 +79,9 @@ async function launch(opts) {
     await send('Emulation.setDeviceMetricsOverride', { width: Math.round(o.width / o.scale), height: Math.round(o.height / o.scale), deviceScaleFactor: o.scale, mobile: false });
   }
   const open = async (hash) => {
+    // A hash-only change does not reload the page, so go through about:blank first.
+    await send('Page.navigate', { url: 'about:blank' });
+    await sleep(100);
     await send('Page.navigate', { url: PAGE + '#' + (hash === undefined ? o.hash : hash) });
     await sleep(300);
     await waitFor("document.body && document.body.getAttribute('data-ready') === '1'", 8000);
