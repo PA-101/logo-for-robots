@@ -41,11 +41,6 @@ Running log of the autonomous build. One entry per task: what was done, test cou
 - Seeds 5, 20, ..., 140 with the last forward halved: the coach finds a fix for all 10; each fix parses, passes and has 1 or 2 edits; each search stays within 3000 candidates. The whole test takes about 5.6 s (target 15 s).
 - Tests: 276 pass.
 
-## Task 29: coach on generated levels
-
-- Seeds 5, 20, ..., 140 with the last forward halved: the coach finds a fix for all 10; each fix parses, passes and has 1 or 2 edits; each search stays within 3000 candidates. The whole test takes about 5.6 s (target 15 s).
-- Tests: 276 pass (suite about 15 s).
-
 ## Task 30: level picker and Challenge seed picker
 
 - The level select has chapter optgroups plus "Challenge mode"; a seed row (number field 1 to 150, PREV, NEXT that wrap around) appears in Challenge mode; the arena header shows "Level N: Name" or "Challenge N (seed N)"; the readout shows power and BUMPER. Hash support: `#level=4`, `#level=c75`, `#level=challenge&seed=75`. Help was done in Part 1.
@@ -86,13 +81,6 @@ Running log of the autonomous build. One entry per task: what was done, test cou
 - Tests: 298 pass.
 - Not verified: in headless Chrome over file:// the clipboard write was not available, so COPY fell back to "The code is selected. Press Ctrl+C to copy it." The clipboard path on GitHub Pages (https) needs a real click to confirm.
 
-## Task 35: export UI
-
-- An "EXPORT TO MICROCONTROLLER CODE" button under the editor opens a modal dialog with the generated C++ (read-only), an uncalibrated note, COPY and CLOSE. A parse error shows "Fix the program first. Line N: ..." instead of code, with COPY disabled. Copy uses the clipboard API in a secure context, otherwise it selects the text and tries execCommand.
-- Browser check: the dialog opens with 60 lines for level 1, and the bad-program case works. No page errors.
-- Tests: 298 pass.
-- Not verified: in headless Chrome over file:// the clipboard write was not available, so COPY fell back to "The code is selected. Press Ctrl+C to copy it." The clipboard path on GitHub Pages (https) needs a real click to confirm.
-
 ## Task 36: judge shortcuts
 
 - A "JUMP TO" row above the editor: BASICS (level 1, the passing example), GRIP AND POWER (level 4 at full power, which slips and fails), BUMPERS (level 7 with distances from layout A: A PASS, B FAIL, C FAIL), CHALLENGE 75 and CHALLENGE 150 (the reference with the last leg halved, which the coach can fix). Each loads the level exactly as the picker does, then puts the starter in the editor.
@@ -119,3 +107,11 @@ Running log of the autonomous build. One entry per task: what was done, test cou
 - After: 0 of 98 states with issues, no console errors. Before and after shots are in docs/screenshots/ (16 files, about 4.4 MB) with a README of findings and fixes.
 - Tests: 308 pass.
 - Not covered: native dropdown lists cannot be captured headless; the export dialog backdrop only covers the window area in full-page shots (a capture effect).
+
+## Part 5: docs
+
+- README: live link (GitHub Pages checked: it serves the current build), how to run, the three chapters and Challenge mode, the commands, the result panel, the coach, the export, developer tools, and Known limitations.
+- Wording decision: you asked the README to say the coach is "not a language model". The existing R8.15 test rejects the words "language model" anywhere in README.md, even in a negation, and loosening it would weaken a test. The README says "search-based planning ... No trained model is involved" instead.
+- KIRO_LOG.md created (it did not exist). docs/kiro-writeup-notes.md lists only what happened, with commits and test counts. It separates bugs found by tests from problems found by screenshots and scripts, and says no separate review agent was run.
+- Process slip: the first commits of task 29 (`f43d71a`) and task 35 (`d9dd231`) came from commands I thought had been interrupted, and were pushed before I had seen their test results. Their code is identical to the later states that passed (276 and 298 tests), so no failing state was pushed. The second commits (`f632b32`, `f3bf635`) only duplicated a report entry; the duplicates were removed.
+- Tests: 308 pass.
