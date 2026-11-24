@@ -124,7 +124,7 @@ Rule for every task below: all existing tests stay green, and `tests/compat.test
 
 - [x] 36. **Judge shortcuts.** A row of quick-jump buttons above the editor: BASICS (level 1), GRIP AND POWER (level 4), BUMPERS (level 7), CHALLENGE 75, CHALLENGE 150. Each loads that level and its starter text, like choosing it in the picker. Test: a pure helper maps each button to the same level the picker would load. _R14.7_
 
-- [ ] 37. **`tools/sim-mcp/` server (not shipped).** A small Node MCP server over stdio, with no dependencies (JSON-RPC written by hand). It provides three tools:
+- [x] 37. **`tools/sim-mcp/` server (not shipped).** A small Node MCP server over stdio, with no dependencies (JSON-RPC written by hand). It provides three tools:
   - `list_levels`: ids, titles, chapters and layout counts.
   - `run_program(level_id, program)`: result, events, final time and charge per layout.
   - `suggest_fix(level_id, program)`: the coach result.

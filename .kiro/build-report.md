@@ -98,3 +98,9 @@ Running log of the autonomous build. One entry per task: what was done, test cou
 - A "JUMP TO" row above the editor: BASICS (level 1, the passing example), GRIP AND POWER (level 4 at full power, which slips and fails), BUMPERS (level 7 with distances from layout A: A PASS, B FAIL, C FAIL), CHALLENGE 75 and CHALLENGE 150 (the reference with the last leg halved, which the coach can fix). Each loads the level exactly as the picker does, then puts the starter in the editor.
 - Tests check the mapping and that each starter behaves as described.
 - Tests: 301 pass.
+
+## Task 37: tools/sim-mcp server
+
+- `tools/sim-mcp/server.js`: MCP over stdio (newline JSON-RPC 2.0, no dependencies) with list_levels, run_program(level_id, program) and suggest_fix(level_id, program); challenge ids are `challenge:N`. Bad ids, bad programs and bad messages return errors and never crash. README explains how to register it in Kiro. `tests/mcp.test.js` drives it through stdin and stdout (4 tests).
+- BLOCKED (registration and calls through Kiro): a Kiro permission rule ("kiro-scope") refused the write to `.kiro/settings/mcp.json`. I did not bypass it. So the tools were not in my catalogue, and `load_resource("tool::logo-for-robots-sim::list_levels")` was rejected. Exact errors are in docs/mcp-proof.md, with a direct stdio transcript that is labelled as not made through Kiro.
+- Tests: 305 pass.
