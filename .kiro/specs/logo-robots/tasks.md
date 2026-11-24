@@ -105,7 +105,7 @@ Rule for every task below: all existing tests stay green, and `tests/compat.test
 
 - [x] 31. **Layout chips and bumper drawing.** Run layout A visibly, then B and C instantly; chips with PASS or FAIL text; replay on click; the status line and the panel name the first failing layout; the coach button uses all layouts; the bumper arc turns amber while pressed. A pure helper that combines per-layout results gets unit tests. _Requirements: 11.5, 13.3, 8.16_
 
-- [ ] 32. **Browser check.** Extend `scripts/e2e-coach.js` (or add `scripts/e2e-levels.js`) to load one level per chapter and challenge seeds 1, 75 and 150. It runs each reference, clicks a failing layout chip, and checks there are no page errors. Take screenshots and check that no text overlaps graphics. The "no AI wording" test also covers `gen.js`. _Requirements: 13.1 to 13.5, 7.1_
+- [x] 32. **Browser check.** Extend `scripts/e2e-coach.js` (or add `scripts/e2e-levels.js`) to load one level per chapter and challenge seeds 1, 75 and 150. It runs each reference, clicks a failing layout chip, and checks there are no page errors. Take screenshots and check that no text overlaps graphics. The "no AI wording" test also covers `gen.js`. _Requirements: 13.1 to 13.5, 7.1_
 
 ## Objectives, export, shortcuts and tooling (after task 32, before task 14)
 

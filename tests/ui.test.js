@@ -228,7 +228,7 @@ test('the coach runs in short slices per frame so the page stays responsive', ()
 });
 
 test('no app text calls the coach AI, a language model or machine learning', () => {
-  for (const file of ['coach.js', 'ui.js', 'index.html', 'README.md', 'style.css']) {
+  for (const file of ['coach.js', 'ui.js', 'index.html', 'README.md', 'style.css', 'gen.js']) {
     const text = fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
     assert.ok(!/\bA\.?I\.?\b|language model|machine learning|\bLLM\b/i.test(text), file + ' mentions AI');
   }

@@ -57,3 +57,10 @@ Running log of the autonomous build. One entry per task: what was done, test cou
 - On chapter 3 levels layout A runs in the arena, then B and C run instantly. Chips under the status line read "A PASS / B FAIL / C FAIL" (text plus colour), and clicking a chip replays that layout. The status line and the panel name the first failing layout ("FAIL: layout B: Stalled against a wall ..."). The coach searches all layouts. The robot has a front bumper arc that turns amber while pressed.
 - Tests: 282 pass.
 - Looks off: after a multi-layout failure the telemetry graph and battery gauge show the layout that ran visibly (A), while the panel explains B. Click the B chip to see B's telemetry.
+
+## Task 32: browser check
+
+- New `scripts/cdp.js` (shared headless-Chrome helper) and `scripts/e2e-levels.js`. Through the real UI at 4x: level 1, level 4, level 7 (all 3 layouts), challenge 1, 75 and 150 all pass with their reference programs. A fixed-distance program on level 7 gives A PASS, B FAIL, C FAIL; clicking the B chip replays layout B. No page errors or console warnings.
+- The no-AI-wording test now also covers gen.js.
+- Tests: 282 pass.
+- Looks off: "PASS on all 3 layouts: Reached the goal in 4.8 s" quotes layout A's time, not the slowest layout's.
