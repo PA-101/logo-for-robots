@@ -97,7 +97,7 @@ Rule for every task below: all existing tests stay green, and `tests/compat.test
 
   Also check that generating all 150 seeds takes under 10 s. _Requirements: 12.2 to 12.6, 12.8_
 
-- [ ] 29. **Coach on generated levels.** For seeds 5, 20, 35, 50, 65, 80, 95, 110, 125 and 140, break the reference by halving its last `forward`. The coach must return a fix that parses, passes and uses at most 2 edits, and the search must stay within 3000 candidates. Record the run time; the target is under 15 s for the whole test. _Requirements: 12.7, 8.4_
+- [x] 29. **Coach on generated levels.** For seeds 5, 20, 35, 50, 65, 80, 95, 110, 125 and 140, break the reference by halving its last `forward`. The coach must return a fix that parses, passes and uses at most 2 edits, and the search must stay within 3000 candidates. Record the run time; the target is under 15 s for the whole test. _Requirements: 12.7, 8.4_
 
 ### UI
 
