@@ -453,7 +453,14 @@
       capacity: capacity,
       step: step,
       sensorDistance: sensorDistance,
-      wallAhead: wallAhead
+      wallAhead: wallAhead,
+      // Read-only copy of the command being run (for tests and the readout), or null.
+      active: function () {
+        if (!active) return null;
+        var copy = {};
+        for (var k in active) if (Object.prototype.hasOwnProperty.call(active, k)) copy[k] = active[k];
+        return copy;
+      }
     };
     state.sensor = sensorDistance();
     return sim;

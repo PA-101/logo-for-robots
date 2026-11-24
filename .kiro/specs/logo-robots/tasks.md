@@ -53,7 +53,7 @@ Rule for every task below: all existing tests stay green, and `tests/compat.test
 
 - [x] 21. **Simulation: power and bumper.** In `sim.js`: `power` state and scaled duties, the stall threshold `STALL_DUTY * power`, the bumper, the bumped flag, `if bumped`, the bump drive with `UNTIL_BUMP_TIMEOUT` and the `bump_timeout` event. New state keys `power`, `bumper`, `bumped`. _Requirements: 9.1 to 9.4, 10.1 to 10.7, 2.11_
 
-- [ ] 22. **Simulation tests for power and bumper.** Unit:
+- [x] 22. **Simulation tests for power and bumper.** Unit:
   - The required slip test: floor friction 0.25, `forward 100` at power 100 records slip events, and `power 50` then `forward 100` records none.
   - Move error within 1.5 cm and turn error within 3 degrees at power 10, 30, 50, 70 and 100.
   - A stall is detected at power 20 (it was not with the old threshold).
