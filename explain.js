@@ -23,8 +23,14 @@
     battery_flat: 'Battery ran flat',
     slip: 'Wheels slipped',
     timeout: 'Ran out of time',
-    program_ended: 'Stopped short of the goal'
+    program_ended: 'Stopped short of the goal',
+    bump_timeout: 'Bumper never touched'
   };
+
+  function bumpTimeoutText(e) {
+    return 'until-bump on line ' + fmt(e.line, 0) + ' drove for ' + fmt(e.elapsed, 1) +
+      ' s without touching a wall, so the program went on to the next command.';
+  }
 
   function stallText(e) {
     return 'The robot stalled against a wall for ' + fmt(e.duration, 1) + ' s, drawing ' + fmt(e.current, 2) +
@@ -36,13 +42,14 @@
       ' C of charge. With no power the motors stop.';
   }
 
-  function slipText(list) {
+  function slipText(list, powerHint) {
     var peak = list[0];
     for (var i = 1; i < list.length; i++) if (num(list[i].peak) > num(peak.peak)) peak = list[i];
     var times = list.length === 1 ? 'once' : list.length + ' times';
     return 'The wheels slipped ' + times + '. They asked the floor for up to ' + fmt(peak.peak, 2) +
       ' N, but the grip limit was ' + fmt(peak.limit, 2) + ' N (friction ' + fmt(peak.mu, 2) +
-      '). A spinning wheel does not push the robot where the program expects.';
+      '). A spinning wheel does not push the robot where the program expects.' +
+      (powerHint ? ' Lower power asks the floor for less force.' : '');
   }
 
   function timeoutText(e) {
@@ -82,12 +89,14 @@
         if (e.type === 'stall') causes.push({ type: 'stall', t: num(e.t), text: stallText(e) });
         else if (e.type === 'battery_flat') causes.push({ type: 'battery_flat', t: num(e.t), text: batteryText(e) });
         else if (e.type === 'timeout') causes.push({ type: 'timeout', t: num(e.t), text: timeoutText(e) });
+        else if (e.type === 'bump_timeout') causes.push({ type: 'bump_timeout', t: num(e.t), text: bumpTimeoutText(e) });
         else if (e.type === 'slip') slips.push(e);
       }
       if (slips.length) {
         var firstSlip = slips[0];
         for (var k = 1; k < slips.length; k++) if (num(slips[k].t) < num(firstSlip.t)) firstSlip = slips[k];
-        causes.push({ type: 'slip', t: num(firstSlip.t), text: slipText(slips) });
+        var level = snap.level && typeof snap.level === 'object' ? snap.level : {};
+        causes.push({ type: 'slip', t: num(firstSlip.t), text: slipText(slips, level.powerMatters === true) });
       }
       if (!causes.length) {
         var ended = null;

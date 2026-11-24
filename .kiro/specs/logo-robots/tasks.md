@@ -64,7 +64,7 @@ Rule for every task below: all existing tests stay green, and `tests/compat.test
 
   Property: the task 9 invariants (charge, speed, walls, NaN, termination, determinism) on random programs that include the new commands; every `until-bump` ends within 17 s of starting (hard limit). _Requirements: 9.2 to 9.6, 10.1 to 10.7, 10.3a, 2.2_
 
-- [ ] 23. **Explain and coach for power, bumper and layouts.** The `bump_timeout` cause; the slip hint on `powerMatters` levels; the coach's `power-change` and gated `power-insert` edits; `createSearch` accepting several layouts. Unit tests: exact power edits for a known program; no power inserts without `powerMatters`; a known fix on an ice test level that inserts `power 60` or `power 80`; a layout search that rejects a fix passing only layout A; the coach golden results are byte-identical. _Requirements: 9.7, 8.2, 8.16, 10.8_
+- [x] 23. **Explain and coach for power, bumper and layouts.** The `bump_timeout` cause; the slip hint on `powerMatters` levels; the coach's `power-change` and gated `power-insert` edits; `createSearch` accepting several layouts. Unit tests: exact power edits for a known program; no power inserts without `powerMatters`; a known fix on an ice test level that inserts `power 60` or `power 80`; a layout search that rejects a fix passing only layout A; the coach golden results are byte-identical. _Requirements: 9.7, 8.2, 8.16, 10.8_
 
 ### Handpicked levels
 

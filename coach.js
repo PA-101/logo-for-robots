@@ -23,7 +23,10 @@
     MAX_EDITS: 2,
     SCALE_FACTORS: [0.5, 0.75, 0.9, 1.1, 1.25, 1.5, 2],
     TURN_DELTAS: [-5, 5, -10, 10, -15, 15, -20, 20, -30, 30, -45, 45],
-    WAITS: [0.5, 1]
+    WAITS: [0.5, 1],
+    POWER_VALUES: [30, 40, 50, 60, 70, 80, 90, 100],   // for an existing power command
+    POWER_INSERTS: [60, 80],                           // inserted before a command, on "power matters" levels
+    MULTI_LAYOUT: 'search'                             // 'off' turns the coach off for multi-layout levels (R8.17)
   };
   var TIE = 1e-9;             // sizes closer than this count as equal
   var ATTEMPT_LIMIT = 4;      // at most 4 * cap edited texts are built, counting ones that do not parse
@@ -31,8 +34,11 @@
   // ---- edits ---------------------------------------------------------------
 
   // All single edits for a program text, in generation order (design.md section 11).
-  function generateEdits(text) {
+  // options.powerInsert adds "insert power P" edits; without it, programs that have no power
+  // command get exactly the original edit list.
+  function generateEdits(text, options) {
     if (typeof text !== 'string') return [];
+    var powerInsert = !!(options && options.powerInsert === true);
     var parsed = lang.parse(text, { positions: true });
     if (!parsed.ok) return [];
     var edits = [];
@@ -48,14 +54,29 @@
         var node = nodes[i];
         if (node.type === 'repeat') { walk(node.body, inLoop || node.n > 1); continue; }
         if (node.type === 'if') { walk(node.body, inLoop); continue; }
+        var where = inLoop ? ' (inside a repeat, so it changes every pass)' : '';
+        var k, n2;
+        if (node.type === 'power') {
+          var pid = nodeIndex++;
+          var pBefore = 'power ' + text.slice(node.numStart, node.numEnd);
+          for (k = 0; k < LIMITS.POWER_VALUES.length; k++) {
+            n2 = LIMITS.POWER_VALUES[k];
+            if (n2 === node.n) continue;
+            add(numberEdit(node, pid, pBefore, n2, Math.abs(n2 - node.n) / 100, 'power', where));
+          }
+          continue;
+        }
+        if (node.type === 'until-bump') {
+          var bid = nodeIndex++;
+          if (powerInsert) addPowerInserts(node, bid, 'until-bump', where);
+          continue;
+        }
         var isMove = node.type === 'forward' || node.type === 'back';
         var isTurn = node.type === 'left' || node.type === 'right';
         if (!isMove && !isTurn) continue;
         var id = nodeIndex++;
         var numText = text.slice(node.numStart, node.numEnd);
         var before = node.type + ' ' + numText;
-        var where = inLoop ? ' (inside a repeat, so it changes every pass)' : '';
-        var k, n2;
         if (isMove && node.n > 0) {
           var seen = {};
           for (k = 0; k < LIMITS.SCALE_FACTORS.length; k++) {
@@ -81,6 +102,19 @@
             });
           }
         }
+        if (powerInsert) addPowerInserts(node, id, before, where);
+      }
+    }
+
+    // "insert power P" before a command; power stays set, so the text says "from line N on".
+    function addPowerInserts(node, id, before, where) {
+      for (var k = 0; k < LIMITS.POWER_INSERTS.length; k++) {
+        var p = LIMITS.POWER_INSERTS[k];
+        add({
+          node: id, line: node.line, kind: 'power-insert', start: node.start, end: node.start,
+          insert: 'power ' + p + ' ', before: before, after: 'power ' + p + ' ' + before, size: (100 - p) / 100,
+          text: 'Line ' + node.line + ': power ' + p + ' before ' + before + ' (power stays ' + p + ' from line ' + node.line + ' on)' + where
+        });
       }
     }
 
@@ -248,9 +282,46 @@
 
   // ---- search ---------------------------------------------------------------
 
-  function createSearch(level, text) {
+  function layoutName(level, i) {
+    return level && typeof level.layout === 'string' && level.layout ? level.layout : String.fromCharCode(65 + i);
+  }
+
+  // levelArg is one built level, or an array of built levels (the layouts of one level).
+  // A candidate passes only if it passes every layout (R8.16).
+  function createSearch(levelArg, text) {
+    var levels = Array.isArray(levelArg) && levelArg.length ? levelArg : [levelArg];
+    var multi = levels.length > 1;
+    var level = levels[0];
+    var powerInsert = levels.some(function (l) { return !!(l && l.powerMatters === true); });
     var src = typeof text === 'string' ? text : (text === null || text === undefined ? '' : String(text));
     var cap = LIMITS.CANDIDATE_CAP;
+
+    // Runs a program on every layout. With one layout this is exactly the original summary.
+    function summariseAll(program) {
+      var runs = levels.map(function (l) { return summarise(l, simMod.runToEnd(l, program)); });
+      if (!multi) { runs[0].runs = runs; runs[0].focus = 0; return runs[0]; }
+      var focus = 0;
+      for (var i = 0; i < runs.length; i++) if (!runs[i].passed) { focus = i; break; }
+      var worst = runs.reduce(function (a, r) { return r.used > a.used ? r : a; }, runs[0]);
+      return {
+        runs: runs, focus: focus, sim: runs[focus].sim,
+        passed: runs.every(function (r) { return r.passed; }),
+        t: Math.max.apply(null, runs.map(function (r) { return r.t; })),
+        used: worst.used, capacity: worst.capacity,
+        distance: Math.max.apply(null, runs.map(function (r) { return r.distance; }))
+      };
+    }
+
+    function multiBeforeLine(before) {
+      var r = before.runs[before.focus];
+      return beforeLine(levels[before.focus], r).replace(/^Before: /, 'Before (layout ' + layoutName(levels[before.focus], before.focus) + '): ');
+    }
+
+    function multiAfterLine(after) {
+      var pct = after.capacity > 0 ? after.used / after.capacity * 100 : 0;
+      return 'After: the robot reaches the goal on all ' + levels.length + ' layouts; the slowest takes ' + fmt(after.t, 1) +
+        ' s and the most charge used is ' + fmt(after.used, 2) + ' C of ' + fmt(after.capacity, 2) + ' C (' + fmt(pct, 0) + '% of the battery).';
+    }
     var state = {
       phase: 'done', tried: 0, attempts: 0, passedCount: 0, best: null, closest: null,
       singles: [], singleAt: 0, pairs: null, pairSize: null, order: 0, before: null, final: null
@@ -271,7 +342,7 @@
       var edited = applyEdits(src, edits);
       var parsed = lang.parse(edited);
       if (!parsed.ok) return false;
-      var run = summarise(level, simMod.runToEnd(level, parsed.program));
+      var run = summariseAll(parsed.program);
       state.tried++;
       var cand = { edits: edits, size: size, text: edited, run: run, order: state.order++ };
       if (run.passed) {
@@ -291,10 +362,12 @@
     function buildResult() {
       var best = state.best;
       if (best) {
-        var lines = [beforeLine(level, state.before)];
+        var lines = [multi ? multiBeforeLine(state.before) : beforeLine(level, state.before)];
         lines.push('Change: ' + best.edits.map(function (e) { return e.text; }).join('; ') + '.');
-        lines.push(afterLine(best.run));
-        lines = lines.concat(comparisonLines(state.before, best.run));
+        lines.push(multi ? multiAfterLine(best.run) : afterLine(best.run));
+        // Compare the same layout before and after (the first one that failed before).
+        var f = state.before.focus;
+        lines = lines.concat(comparisonLines(state.before.runs[f], best.run.runs[f]));
         lines.push('Tried ' + state.tried + ' changes; ' + state.passedCount + ' passed. This is the smallest change that works.');
         return {
           found: true,
@@ -330,13 +403,18 @@
         state.final = failResult(src, (err.line > 0 ? 'Fix the error on line ' + err.line + ' first: ' : 'Fix the program first: ') +
           err.message + ' The coach only changes programs that run.', 0);
       } else {
-        state.before = summarise(level, simMod.runToEnd(level, parsed.program));
-        if (state.before.passed) {
-          state.final = failResult(src, 'This program already passes' + (level && level.id ? ' level ' + level.id : '') +
-            ' in ' + fmt(state.before.t, 1) + ' s. Nothing to fix.', 0);
+        if (multi && LIMITS.MULTI_LAYOUT === 'off') {
+          state.final = failResult(src, 'No suggestion for multi-layout levels.', 0);
         } else {
-          state.singles = generateEdits(src);
-          state.phase = 'singles';
+          state.before = summariseAll(parsed.program);
+          if (state.before.passed) {
+            state.final = failResult(src, 'This program already passes' + (level && level.id ? ' level ' + level.id : '') +
+              (multi ? ' on all ' + levels.length + ' layouts' : '') +
+              ' in ' + fmt(state.before.t, 1) + ' s. Nothing to fix.', 0);
+          } else {
+            state.singles = generateEdits(src, { powerInsert: powerInsert });
+            state.phase = 'singles';
+          }
         }
       }
     } catch (e) {
