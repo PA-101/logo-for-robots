@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 // Task 23: explain and coach for power, bumper and layouts.
 const test = require('node:test');
 const assert = require('node:assert');
@@ -160,4 +160,68 @@ test('the slip hint appears only on "power matters" levels; other texts are unch
   assert.strictEqual(plain, base);
   assert.strictEqual(hint, base + ' Lower power asks the floor for less force.');
   assert.ok(!base.includes('Lower power'));
+});
+
+// ---- power first (R8.18) ---------------------------------------------------------
+
+// The ice hairpin from design section 7b with its starting values, defined here so that
+// later tuning of level 4 cannot change this test.
+function iceHairpin(powerMatters) {
+  const level = buildLevel({ id: 94, name: 'Ice hairpin (test)', capacity: 2.5, timeLimit: 40, slickMu: 0.08,
+    map: ['############', '#Sooooooooo#', '##########o#', '#Gooooooooo#', '############'] });
+  level.powerMatters = powerMatters;
+  return level;
+}
+const HAIRPIN = 'forward 450\nright 90\nforward 100\nright 90\nforward 450';
+
+test('power first: slip as root cause on a "power matters" level picks a power fix over a smaller angle fix', () => {
+  const level = iceHairpin(true);
+  const before = runToEnd(level, parse(HAIRPIN).program);
+  const exp = explain({ result: before.result, events: before.events, state: before.state, level });
+  assert.strictEqual(exp.causes[0].type, 'slip', 'the root cause is wheel slip');
+  // An angle edit alone would also pass, and it is a smaller edit than any power insert.
+  const angle = generateEdits(HAIRPIN).find((e) => e.kind === 'turn' && e.line === 4 && e.insert === '80');
+  assert.ok(passes(level, applyEdits(HAIRPIN, [angle])), 'right 80 on line 4 passes too');
+  assert.ok(angle.size < 0.2, 'and is smaller than power 80 (size 0.2)');
+
+  const r = coach(level, HAIRPIN);
+  assert.strictEqual(r.found, true);
+  assert.strictEqual(r.edits.length, 1);
+  assert.strictEqual(r.edits[0].kind, 'power-insert', JSON.stringify(r.edits));
+  assert.ok(passes(level, r.program));
+  const lines = r.explanation.split('\n');
+  assert.strictEqual(lines[lines.length - 2], 'Power first: wheel slip was the root cause on a level where power matters, ' +
+    'so power changes were tried before angles and distances.');
+  // Only power edits were simulated: 5 moves and turns x 2 power values.
+  assert.strictEqual(r.tried, generateEdits(HAIRPIN, { powerInsert: true }).filter((e) => e.kind === 'power-insert').length);
+});
+
+test('power first does not apply without "power matters": the angle fix is still chosen', () => {
+  const r = coach(iceHairpin(false), HAIRPIN);
+  assert.strictEqual(r.found, true);
+  assert.strictEqual(r.edits[0].kind, 'turn');
+  assert.ok(!r.explanation.includes('Power first'));
+});
+
+test('power first does not apply when the root cause is not slip', () => {
+  // Normal floor marked "power matters": the program stops short, so the root cause is program_ended.
+  const level = getLevel(1);
+  level.powerMatters = true;
+  const text = 'forward 200\nright 90\nforward 50';
+  const sim = runToEnd(level, parse(text).program);
+  assert.strictEqual(explain({ result: sim.result, events: sim.events, state: sim.state, level }).causes[0].type, 'program_ended');
+  const r = coach(level, text);
+  assert.strictEqual(r.found, true);
+  assert.deepStrictEqual(r.edits.map((e) => e.text), ['Line 3: forward 50 -> forward 100']);
+  assert.ok(!r.explanation.includes('Power first'));
+  // normal order: every single edit (power inserts included) is simulated before ranking
+  assert.strictEqual(r.tried, generateEdits(text, { powerInsert: true }).length);
+});
+test('power first with a power edit that cannot pass falls back to the normal search', () => {
+  // Battery so small that no power helps on its own; the normal search then runs too.
+  const level = iceHairpin(true);
+  level.capacity = 0.3;
+  const r = coach(level, HAIRPIN);
+  const powerOnly = generateEdits(HAIRPIN, { powerInsert: true }).filter((e) => e.kind === 'power-insert').length;
+  assert.ok(r.tried > powerOnly, 'the search went on after the power phase (' + r.tried + ' tried)');
 });

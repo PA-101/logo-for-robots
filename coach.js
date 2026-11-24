@@ -29,6 +29,9 @@
     MULTI_LAYOUT: 'search'                             // 'off' turns the coach off for multi-layout levels (R8.17)
   };
   var TIE = 1e-9;             // sizes closer than this count as equal
+  var POWER_FIRST_LINE = 'Power first: wheel slip was the root cause on a level where power matters, ' +
+    'so power changes were tried before angles and distances.';
+  function isPowerEdit(e) { return e.kind === 'power' || e.kind === 'power-insert'; }
   var ATTEMPT_LIMIT = 4;      // at most 4 * cap edited texts are built, counting ones that do not parse
 
   // ---- edits ---------------------------------------------------------------
@@ -312,6 +315,13 @@
       };
     }
 
+    // Type of the first cause in the explanation of the first failing layout.
+    function rootCause(summary) {
+      var f = summary.focus, sim = summary.runs[f].sim;
+      var exp = explainMod.explain({ result: sim.result, events: sim.events, state: sim.state, level: levels[f] });
+      return exp.causes.length ? exp.causes[0].type : null;
+    }
+
     function multiBeforeLine(before) {
       var r = before.runs[before.focus];
       return beforeLine(levels[before.focus], r).replace(/^Before: /, 'Before (layout ' + layoutName(levels[before.focus], before.focus) + '): ');
@@ -324,7 +334,8 @@
     }
     var state = {
       phase: 'done', tried: 0, attempts: 0, passedCount: 0, best: null, closest: null,
-      singles: [], singleAt: 0, pairs: null, pairSize: null, order: 0, before: null, final: null
+      singles: [], singleAt: 0, pairs: null, pairSize: null, order: 0, before: null, final: null,
+      powerFirst: false, powerEdits: [], powerAt: 0
     };
 
     function rankLess(a, b) {
@@ -368,6 +379,7 @@
         // Compare the same layout before and after (the first one that failed before).
         var f = state.before.focus;
         lines = lines.concat(comparisonLines(state.before.runs[f], best.run.runs[f]));
+        if (state.powerFirst) lines.push(POWER_FIRST_LINE);
         lines.push('Tried ' + state.tried + ' changes; ' + state.passedCount + ' passed. This is the smallest change that works.');
         return {
           found: true,
@@ -414,6 +426,11 @@
           } else {
             state.singles = generateEdits(src, { powerInsert: powerInsert });
             state.phase = 'singles';
+            // R8.18: slip as the root cause on a "power matters" level tries power edits first.
+            if (powerInsert && rootCause(state.before) === 'slip') {
+              state.powerEdits = state.singles.filter(isPowerEdit);
+              if (state.powerEdits.length) { state.powerFirst = true; state.powerAt = 0; state.phase = 'power'; }
+            }
           }
         }
       }
@@ -438,7 +455,17 @@
               continue;
             }
             var e = state.singles[state.singleAt++];
+            if (state.powerFirst && isPowerEdit(e)) continue;     // already tried in the power phase
             if (evaluate([e], e.size)) budget--;
+          } else if (state.phase === 'power') {
+            // R8.18: power edits first; if one passes, the best of them wins.
+            if (state.powerAt >= state.powerEdits.length) {
+              if (state.best) { finish(); break; }
+              state.phase = 'singles';
+              continue;
+            }
+            var pe = state.powerEdits[state.powerAt++];
+            if (evaluate([pe], pe.size)) budget--;
           } else {
             var pair = state.pairs.next();
             if (!pair) { finish(); break; }
