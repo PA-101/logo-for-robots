@@ -1,4 +1,4 @@
-# Requirements: Logo for Robots
+﻿# Requirements: Logo for Robots
 
 Scope is exactly the list below. Sound, 3D graphics, accounts, saving, mobile layout, AI models and multiplayer are out of scope.
 
@@ -99,6 +99,7 @@ The coach is a search: it tries small changes to the numbers in the student's pr
 8.14 When the user presses "SUGGEST A FIX" after a failed run, the system shall show search progress, keep the page responsive, and then show the edits and the explanation in the "Why did it fail?" panel. When the user presses "APPLY FIX", the system shall put the edited program in the editor without running it. Reset cancels a search in progress.
 8.15 No text in the app or its documentation shall describe the coach as AI, a language model or machine learning.
 8.16 When the level has several layouts (R11.5), the system shall accept a candidate only if it passes every layout, and the explanation shall name the layout it quotes numbers from.
+8.17 Decision rule: task 26 measures the coach test on the chapter 3 levels. If that test takes more than 15 s, then on multi-layout levels the coach shall not search and shall show "No suggestion for multi-layout levels." instead (with `found: false`, `tried: 0`). Single-layout levels are unaffected either way. The measured time and the decision are recorded in design section 10.
 
 ## R9. Drive power
 
@@ -115,7 +116,8 @@ The coach is a search: it tries small changes to the numbers in the student's pr
 
 10.1 The robot shall have a front bumper that is pressed while the robot touches a wall within 60 degrees either side of its heading.
 10.2 When the program contains `until-bump`, the system shall drive forward at the current power until the bumper is pressed, then cut the motors, let the robot settle, and continue with the next command. If the bumper is already pressed, the command ends at once.
-10.3 If `until-bump` drives for 15 s without the bumper being pressed, then the system shall stop it, record a `bump_timeout` event with the line number, and continue with the next command, so the command can never run forever.
+10.3 If `until-bump` drives for 15 s without the bumper being pressed, then the system shall stop it, record a `bump_timeout` event with the line number, and continue with the next command.
+10.3a Hard limit: an `until-bump` command shall always end within 17 s of starting: at most 15 s of driving plus at most 2 s of braking to settle. When the 2 s settle cap is reached, the command ends even if the robot is still moving.
 10.4 Because `until-bump` cuts the motors when the bumper is pressed, it shall not cause a `stall` event by itself.
 10.5 The system shall keep a "bumped" flag that is set whenever wall contact begins (at any speed, from any direction).
 10.6 When the program contains `if bumped [ ... ]`, the system shall read the flag at the moment the command is reached, run the block if it is set, and clear the flag.
@@ -149,3 +151,15 @@ The coach is a search: it tries small changes to the numbers in the student's pr
 13.3 On a level with layouts, after a run the system shall show the result for each layout as a labelled chip (for example "B FAIL"), and clicking a chip shall replay that layout in the arena.
 13.4 The command help shall list `power`, `until-bump` and `if bumped`.
 13.5 The UI shall stay 2D, silent and without accounts.
+
+## R14. Objectives, export, shortcuts and tooling
+
+14.1 Every level, handpicked or generated, shall have a title, a one-sentence objective and a hint, and the system shall show them above the arena.
+14.2 For generated levels, the system shall build the title, objective and hint from facts about the level (number of turns, slick and icy patches), so the text always matches the level.
+14.3 When the user exports a program, the system shall translate the parsed program into C++ for a microcontroller with two PWM motor outputs and delay-based timing, covering every command (including `repeat`, `if wall-ahead`, `power`, `until-bump` and `if bumped`).
+14.4 The exported timing constants shall be derived from the simulator, and comments in the output shall say they are uncalibrated and must be tuned on a real robot.
+14.5 The export shall never throw on any valid program, and shall report the parse error instead of code for an invalid one.
+14.6 When the user presses "EXPORT TO MICROCONTROLLER CODE", the system shall show the code with a COPY button. The UI and the exported code shall contain no third-party brand names.
+14.7 The system shall show quick-jump buttons for Basics, Grip and Power, Bumpers, Challenge 75 and Challenge 150.
+14.8 A developer tool `tools/sim-mcp/` (not part of the shipped app) shall provide an MCP server with the tools `list_levels`, `run_program(level_id, program)` and `suggest_fix(level_id, program)`, and a README explaining how to register it in Kiro.
+14.9 A second Kiro hook shall run the level and generator tests when `levels.js` or `gen.js` is saved.

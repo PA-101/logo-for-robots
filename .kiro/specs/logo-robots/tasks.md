@@ -28,7 +28,7 @@ Build in this order. Each task is small, ends with a passing `node --test tests/
 
 - [x] 13. **Telemetry graph and "Why did it fail?" panel.** Graph canvas with reserved margins for axes and legend (speed green, current amber, battery dashed), cleared on Reset; panel with PASS/FAIL result and the explain text; amber and red styling with text labels. _Requirements: 4.2, 4.3, 4.4, 5.1 to 5.8_
 
-- [ ] 14. **Final check and README.** Do this last, after tasks 15 to 32. Also walk through one level per chapter and three challenge seeds (1, 75, 150). Manual walkthrough of all 3 levels by double-clicking `index.html` in a current browser (pass each with its reference program; trigger stall, battery flat, slip, timeout and see the panel; ask the coach for a fix on a failing run and apply it); check no text overlaps graphics; confirm no DOM use outside `ui.js` with a grep test; finish `README.md`. _Requirements: 7.1 to 7.3, 8.14, 8.15_
+- [ ] 14. **Final check and README.** Do this last, after tasks 15 to 38. Also walk through one level per chapter and three challenge seeds (1, 75, 150). Manual walkthrough of all 3 levels by double-clicking `index.html` in a current browser (pass each with its reference program; trigger stall, battery flat, slip, timeout and see the panel; ask the coach for a fix on a failing run and apply it); check no text overlaps graphics; confirm no DOM use outside `ui.js` with a grep test; finish `README.md`. _Requirements: 7.1 to 7.3, 8.14, 8.15_
 
 ## Auto-Fix Coach (added after the first 14 tasks)
 
@@ -62,7 +62,7 @@ Rule for every task below: all existing tests stay green, and `tests/compat.test
   - `if bumped` is true once after a contact, then false.
   - `power 100` gives runs identical to having no `power` command.
 
-  Property: the task 9 invariants (charge, speed, walls, NaN, termination, determinism) on random programs that include the new commands; `until-bump` never lasts more than 15 s plus settling. _Requirements: 9.2 to 9.6, 10.1 to 10.7, 2.2_
+  Property: the task 9 invariants (charge, speed, walls, NaN, termination, determinism) on random programs that include the new commands; every `until-bump` ends within 17 s of starting (hard limit). _Requirements: 9.2 to 9.6, 10.1 to 10.7, 10.3a, 2.2_
 
 - [ ] 23. **Explain and coach for power, bumper and layouts.** The `bump_timeout` cause; the slip hint on `powerMatters` levels; the coach's `power-change` and gated `power-insert` edits; `createSearch` accepting several layouts. Unit tests: exact power edits for a known program; no power inserts without `powerMatters`; a known fix on an ice test level that inserts `power 60` or `power 80`; a layout search that rejects a fix passing only layout A; the coach golden results are byte-identical. _Requirements: 9.7, 8.2, 8.16, 10.8_
 
@@ -79,7 +79,9 @@ Rule for every task below: all existing tests stay green, and `tests/compat.test
   - Level 6: power 60 everywhere fails on time.
   - Chapter 3: the reference uses `until-bump`, and a fixed-distance program measured on layout A fails at least one other layout.
 
-  If a level cannot meet these, stop and report it rather than loosening a test. _Requirements: 11.2 to 11.5_
+  Also time the coach test on the chapter 3 levels. If it takes more than 15 s, set `LIMITS.MULTI_LAYOUT = 'off'` (R8.17), test the "No suggestion for multi-layout levels." result, and record the time and the decision in design section 10.
+
+  If a level cannot meet these, stop and report it rather than loosening a test. _Requirements: 11.2 to 11.5, 8.17_
 
 ### Challenge Mode
 
@@ -104,3 +106,29 @@ Rule for every task below: all existing tests stay green, and `tests/compat.test
 - [ ] 31. **Layout chips and bumper drawing.** Run layout A visibly, then B and C instantly; chips with PASS or FAIL text; replay on click; the status line and the panel name the first failing layout; the coach button uses all layouts; the bumper arc turns amber while pressed. A pure helper that combines per-layout results gets unit tests. _Requirements: 11.5, 13.3, 8.16_
 
 - [ ] 32. **Browser check.** Extend `scripts/e2e-coach.js` (or add `scripts/e2e-levels.js`) to load one level per chapter and challenge seeds 1, 75 and 150. It runs each reference, clicks a failing layout chip, and checks there are no page errors. Take screenshots and check that no text overlaps graphics. The "no AI wording" test also covers `gen.js`. _Requirements: 13.1 to 13.5, 7.1_
+
+## Objectives, export, shortcuts and tooling (after task 32, before task 14)
+
+- [ ] 33. **Level objectives.** Every level, handpicked and generated, gets `title`, `objective` (one sentence) and `hint`, shown above the arena. Handpicked levels write theirs in `levels.js`. `gen.js` builds them from facts about the generated level, for example: "Challenge 97: 7 turns, 2 icy patches" / "Reach the goal at the end of the corridor." / "Lower power on the 2 icy patches." Tests: every level in `ALL_LEVELS` and all 150 seeds has a non-empty title, a single-sentence objective (one final period, under 120 characters) and a hint; generated text matches the level's real turn count and patch counts; the same seed gives the same text. _New requirement R14.1, R14.2_
+
+- [ ] 34. **Microcontroller export `export.js` (no DOM).** `toCpp(program, options)` turns a parsed program into plain C++ with two PWM motor outputs, delay-based timing, a distance sensor read for `if wall-ahead`, a bumper read for `until-bump` and `if bumped`, and `for` loops for `repeat`. The timing constants (ms per cm and ms per degree at power 100, scaled by 1 / power) are derived from the simulator: one simulated `forward 100` and one `left 90` at module load. A header comment and the comment beside each constant say the constants are uncalibrated and must be tuned on a real robot. The board functions (`setMotorPwm`, `readDistanceCm`, `bumperPressed`, `delayMs`, `millisNow`) are declared for the user to provide. The output contains no third-party brand names. Tests:
+  - Fixed expected outputs for 5 sample programs (stored in `tests/fixtures/export/`).
+  - Never throws on random valid programs, including the new commands.
+  - Every command type produces its own code line, with a `// line N` comment.
+  - Nesting depth and loop counts are preserved.
+  - A brand-name check finds none.
+
+  _R14.3 to R14.5_
+
+- [ ] 35. **Export UI.** An "EXPORT TO MICROCONTROLLER CODE" button under the editor opens a panel with the generated text (read-only, monospace) and a COPY button. Copy uses the clipboard API when available and otherwise selects the text. A parse error shows the error instead of code. No third-party brand names appear anywhere in the UI. Tests: pure helpers for the panel text; the no-brand-name check covers `ui.js`, `index.html` and `export.js`. _R14.5, R14.6_
+
+- [ ] 36. **Judge shortcuts.** A row of quick-jump buttons above the editor: BASICS (level 1), GRIP AND POWER (level 4), BUMPERS (level 7), CHALLENGE 75, CHALLENGE 150. Each loads that level and its starter text, like choosing it in the picker. Test: a pure helper maps each button to the same level the picker would load. _R14.7_
+
+- [ ] 37. **`tools/sim-mcp/` server (not shipped).** A small Node MCP server over stdio, with no dependencies (JSON-RPC written by hand). It provides three tools:
+  - `list_levels`: ids, titles, chapters and layout counts.
+  - `run_program(level_id, program)`: result, events, final time and charge per layout.
+  - `suggest_fix(level_id, program)`: the coach result.
+
+  Challenge levels use ids `challenge:N`. `tools/sim-mcp/README.md` explains how to register it in Kiro's `.kiro/settings/mcp.json` (example entry, not added automatically). Nothing in `index.html` loads it. Tests: drive the server through stdin and stdout for `initialize`, `tools/list` and each tool call, including bad level ids and bad programs (an error result, never a crash). _R14.8_
+
+- [ ] 38. **Second Kiro hook.** Add `.kiro/hooks/run-level-tests-on-save.json`. It runs `node --test tests/levels.test.js tests/levels.chapters.test.js tests/gen.test.js tests/gen.property.test.js` when `levels.js` or `gen.js` is saved, using the same format as the existing hook and the matcher `(^|[\\/])(levels|gen)\.js$`. Test: both hook files parse as JSON with the required fields, and the new matcher matches `levels.js` and `gen.js` but not `sim.js`. _R14.9_

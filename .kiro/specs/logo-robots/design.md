@@ -14,12 +14,14 @@ telemetry.js    sample recorder + graph scaling (no DOM)
 explain.js      failure explanation         (no DOM)
 coach.js        Auto-Fix Coach search       (no DOM)
 gen.js          Challenge Mode level generator (no DOM)
+export.js       program to microcontroller C++ (no DOM, task 34)
 ui.js           editor, controls, canvas drawing, main loop (only DOM user)
 tests/          helpers.js, *.test.js (node --test tests/)
 tests/fixtures/ golden-runs.json (recorded before the power/bumper change, see section 12)
+tools/sim-mcp/  developer MCP server, not shipped (task 37)
 ```
 
-Script order in `index.html`: `lang.js`, `levels.js`, `sim.js`, `telemetry.js`, `explain.js`, `coach.js`, `gen.js`, `ui.js`. Each logic file ends with `if (typeof module !== 'undefined') module.exports = {...}` and otherwise attaches to `window.LFR.<name>` (see steering/tech.md). Under Node, files load each other with `require`.
+Script order in `index.html`: `lang.js`, `levels.js`, `sim.js`, `telemetry.js`, `explain.js`, `coach.js`, `gen.js`, `export.js`, `ui.js`. Each logic file ends with `if (typeof module !== 'undefined') module.exports = {...}` and otherwise attaches to `window.LFR.<name>` (see steering/tech.md). Under Node, files load each other with `require`.
 
 ## 2. Units and coordinates
 - SI units in the simulation: meters, seconds, kilograms, newtons, amperes, volts, coulombs, radians.
@@ -64,6 +66,7 @@ Script order in `index.html`: `lang.js`, `levels.js`, `sim.js`, `telemetry.js`, 
 | `STALL_DUTY` | | 0.2 | a wheel counts as "commanded" above `STALL_DUTY * power` |
 | `BUMPER_COS` | | 0.5 | bumper pressed when a contact normal `n` has `n . heading < -BUMPER_COS` (within 60 degrees of straight ahead) |
 | `UNTIL_BUMP_TIMEOUT` | | 15 s | longest `until-bump` drive before `bump_timeout` |
+| `UNTIL_BUMP_SETTLE_MAX` | | 2 s | longest braking phase of `until-bump`; with the drive timeout this is a hard 17 s limit per command |
 
 Derived (documented for tests): no-load speed `V_NL = WHEEL_R * V_FULL / KE = 0.80 m/s`. Normal force per wheel `N = MASS * G / 2 = 9.81 N`. Friction limit per wheel `F_max = mu * N` (5.89 N on normal floor).
 
@@ -119,7 +122,7 @@ Active command behavior (each step):
 - **Move**: `travelled += d * v * DT`, `rem = target - travelled`. While `rem > BRAKE_TAU * |v| + 0.005`: `uL = uR = d * CRUISE_DUTY * power`. Otherwise `uL = uR = 0` (brake). The move ends when `rem <= BRAKE_TAU * |v| + 0.005`, `|v| < 0.02` and `|w| < 0.05`. If the robot is blocked and stalled, it keeps pushing until the timeout or battery ends the run.
 - **Turn**: `turned += d * w * DT`, `rem = target - turned`. While `rem > TURN_BRAKE_TAU * |w| + 0.01`: `uL = -d * td`, `uR = d * td`, where `td = TURN_SLOW_DUTY * power` if `rem < TURN_SLOW_ZONE` and `TURN_DUTY * power` otherwise. Otherwise brake (`u = 0`). Moves and turns latch into braking: once braking starts it continues until the command ends. Ends when braking and `|w| < 0.05` and `|v| < 0.02`.
 - **Wait**: `u = 0` until `N` seconds pass.
-- **Bump drive** (new): `elapsed += DT`. While not braking: if `bumper` (from the previous step's contact) then start braking; else if `elapsed >= UNTIL_BUMP_TIMEOUT` record `bump_timeout {t, line}` and start braking; else `uL = uR = CRUISE_DUTY * power`. Braking: `u = 0` until `|v| < 0.02` and `|w| < 0.05`, then the command ends. Cutting the motors on contact means `until-bump` never produces a `stall`.
+- **Bump drive** (new): `elapsed += DT`. While not braking: if `bumper` (from the previous step's contact) then start braking; else if `elapsed >= UNTIL_BUMP_TIMEOUT` record `bump_timeout {t, line}` and start braking; else `uL = uR = CRUISE_DUTY * power`. Braking: `u = 0` until `|v| < 0.02` and `|w| < 0.05`, or until `UNTIL_BUMP_SETTLE_MAX` (2 s) of braking has passed, then the command ends. So every `until-bump` ends within `UNTIL_BUMP_TIMEOUT + UNTIL_BUMP_SETTLE_MAX` = 17 s (R10.3a), whatever the floor or walls do. Cutting the motors on contact means `until-bump` never produces a `stall`.
 
 Spec-time measurement with emulated power (duties scaled by hand in a throwaway script): move error stays within 1.5 cm and turn error within 1.5 degrees at every power from 10 to 100; time grows roughly as 1 / power (`forward 300`: 5.3 s at 100, 48.5 s at 10). With the old fixed 0.2 stall threshold no stall was detected at power 20 or below, which is why the threshold scales with power.
 
@@ -380,6 +383,8 @@ Power edits, with sizes on the same scale as the other edits:
 
 Layouts: `createSearch(levelOrLevels, text)` also accepts an array of built levels (the 3 layouts of a chapter 3 level). A candidate passes only if it passes every layout. For ranking it uses the largest finish time and the largest charge used across layouts. "Closest" for an honest failure uses each candidate's worst layout distance. The explanation quotes the first failing layout of the original run and prefixes its lines with the layout, for example `Before (layout B): ...`. A single level behaves exactly as today. A search over 3 layouts costs about 3 times as much per candidate; the 3000-candidate cap is unchanged.
 
+Multi-layout fallback (R8.17): `LIMITS.MULTI_LAYOUT` is `'search'` by default. If task 26 finds that the coach test on chapter 3 takes more than 15 s, it is set to `'off'`. Then `createSearch` with more than one layout returns at once with `{ found: false, program: text, edits: [], explanation: 'No suggestion for multi-layout levels.', tried: 0 }`, and the UI shows that text in place of the search. Task 26 records the measured time and the setting in section 10.
+
 Compatibility: chapter 1 levels have `powerMatters` false and one layout, so the coach produces byte-identical results there. Task 23 checks this against the recorded coach outputs in the golden fixture (section 12).
 
 ## 12. Compatibility check (golden runs)
@@ -424,3 +429,21 @@ Budget, by simulation:
 - **Help:** add `power 60  ; percent, 10 to 100`, `until-bump`, and `if bumped [ ... ]`.
 - **Arena sizing:** `arenaHeight` and `fitTransform` already handle any map size. Challenge maps are at most 15 by 11 cells.
 - **Out of scope:** 3D, sound, accounts, saving of progress.
+
+## 15. Objectives, export, shortcuts and tooling (tasks 33 to 38)
+
+**Objectives.** Level definitions gain `title`, `objective` and `hint`, shown in one block above the arena (title on its own line, then the objective, then the hint in muted text). Generated levels use templates filled from facts: `turns`, `slickPatches`, `icePatches` and path length in metres. Example: title `Challenge 97: 7 turns, 2 icy patches`; objective `Reach the goal at the end of a 9.5 m corridor.`; hint `Lower power before the 2 icy patches.`, or `Count the turns: right, left, left, right, ...` when there is no ice.
+
+**Export (`export.js`, no DOM).** `toCpp(programOrText, { title })` returns `{ ok, code, errors }`. Structure of the output:
+- a header comment: generated by Logo for Robots, uncalibrated, tune on a real robot;
+- `const` timing values with a "derived from the simulator, uncalibrated" comment on each: `MS_PER_CM`, `MS_PER_DEG`, `CRUISE_PWM` (0 to 255 from `CRUISE_DUTY`), `TURN_PWM`, `WALL_AHEAD_CM` (35), `UNTIL_BUMP_MAX_MS` (15000);
+- declarations of the board functions the user provides: `setMotorPwm(int left, int right)` (signed -255 to 255), `int readDistanceCm()`, `bool bumperPressed()`, `void delayMs(unsigned long)`, `unsigned long millisNow()`;
+- one `runProgram()` function with one statement block per command and a `// line N` comment.
+
+Mapping: `forward N` gives `setMotorPwm(p, p); delayMs(N * MS_PER_CM / power); setMotorPwm(0, 0);`. Turns work the same way with opposite signs. `repeat N [...]` becomes `for (int iK = 0; iK < N; iK++) { ... }`. `if wall-ahead` becomes `if (readDistanceCm() < WALL_AHEAD_CM) { ... }`. `if bumped` uses a `bumped` flag that is set whenever `bumperPressed()` is polled true and cleared on read. `until-bump` becomes a loop that drives until `bumperPressed()` or `UNTIL_BUMP_MAX_MS`. `power N` sets a `power` variable. `wait N` becomes `delayMs(N * 1000)`. The timing values come from simulating `forward 100` and `left 90` at power 100 once, including acceleration and braking. No third-party brand names appear in the output or the UI.
+
+**Judge shortcuts.** One button row above the editor; each button calls the same load function as the picker.
+
+**`tools/sim-mcp/`.** `server.js` reads newline-delimited JSON-RPC 2.0 on stdin and writes responses on stdout. It handles `initialize`, `tools/list` and `tools/call` for the three tools, and returns errors as tool results. It requires the app's logic files from `../../`. It is not loaded by `index.html` and has no dependencies. The README shows an `mcp.json` entry (`command: "node"`, `args: ["tools/sim-mcp/server.js"]`).
+
+**Second hook.** `.kiro/hooks/run-level-tests-on-save.json`, in the same `v1` format as `run-tests-on-save.json`.

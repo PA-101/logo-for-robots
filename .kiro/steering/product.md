@@ -1,4 +1,4 @@
-# Product: Logo for Robots
+﻿# Product: Logo for Robots
 
 Logo for Robots revives Logo, the 1960s turtle-programming language, to teach how real robots behave. It is a Kiroween 2026 entry in the Resurrection category.
 
@@ -23,6 +23,9 @@ In scope:
 - "Why did it fail?" panel.
 - Auto-Fix Coach: a deterministic search that tries small numeric edits and simulates each one. It is never described as AI.
 - Run, Reset and a speed control.
+- A title, objective and hint for every level; quick-jump buttons for judges.
+- Export of a program to plain microcontroller C++ (uncalibrated timing, no brand names).
+- Developer tooling that is not shipped: an MCP server in `tools/sim-mcp/` and Kiro hooks.
 
 Out of scope: sound, 3D graphics, accounts, saving, mobile layout, AI models, multiplayer. Do not add them.
 
