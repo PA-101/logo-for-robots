@@ -1,0 +1,5 @@
+until-bump
+back 15
+right 90
+forward 50
+if bumped [ back 10 ]

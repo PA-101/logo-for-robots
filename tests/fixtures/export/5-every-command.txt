@@ -1,0 +1,11 @@
+; every command
+power 50
+repeat 2 [
+  repeat 3 [ forward 12.5 left 30 ]
+  if wall-ahead [ right 90 ]
+]
+wait 0.5
+until-bump
+if bumped [ back 20 ]
+power 100
+right 45

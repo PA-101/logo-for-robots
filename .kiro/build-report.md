@@ -71,3 +71,10 @@ Running log of the autonomous build. One entry per task: what was done, test cou
 - Level 1's hint was replaced, because it repeated the objective.
 - Bug found by checking the output by eye, not by a test: "a 11.5 m corridor". Fixed, and the new test checks the article.
 - Tests: 286 pass.
+
+## Task 34: microcontroller export export.js
+
+- `toCpp(program, { title })` emits plain C++: an UNCALIBRATED header, constants derived from the simulator with "uncalibrated" on each line (MS_PER_CM 20.83, MS_PER_DEG 8.52, CRUISE_PWM 204, TURN_PWM 153, WALL_AHEAD_CM 35, UNTIL_BUMP_MAX_MS 15000), declarations of five board functions the user provides, helpers (driveFor polls the bumper, untilBump, checkBumped), and runProgram with one commented line per command. A title cannot close the C comment.
+- Five fixed expected outputs are in tests/fixtures/export/. `scripts/check-export-compiles.js` compiled all five with g++ -std=c++11 -Wall -Wextra -fsyntax-only against stub board functions: all OK (a developer check, not part of node --test).
+- Tests: 296 pass.
+- Physically: the export uses dead reckoning by time, so on a real robot distances and angles will drift; the header says so.
