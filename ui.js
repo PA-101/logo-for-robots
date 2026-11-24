@@ -97,6 +97,43 @@
     return { visible: true, heading: 'WHY DID IT FAIL?', kind: 'fail', line: causes.length ? '' : String(exp.summary || ''), causes: causes, showCoach: true };
   }
 
+  // ---- level picker helpers (pure) -------------------------------------
+  var CHALLENGE_VALUE = 'challenge';
+
+  // Option groups for the level <select>: one per chapter, then "Challenge".
+  function levelOptions(chapters, defs) {
+    var byId = {};
+    (defs || []).forEach(function (d) { byId[d.id] = d; });
+    var groups = (chapters || []).map(function (ch) {
+      return {
+        label: 'Chapter ' + ch.id + ': ' + ch.name,
+        options: ch.levels.filter(function (id) { return byId[id]; }).map(function (id) {
+          return { value: String(id), label: id + '. ' + byId[id].name };
+        })
+      };
+    });
+    groups.push({ label: 'Challenge', options: [{ value: CHALLENGE_VALUE, label: 'Challenge mode (seeds 1 to 150)' }] });
+    return groups;
+  }
+
+  // What a picker value or a #level= hash value means.
+  function parseLevelKey(value, seed) {
+    if (value === CHALLENGE_VALUE || /^c\d+$/i.test(String(value))) {
+      var s = value === CHALLENGE_VALUE ? seed : String(value).slice(1);
+      var n = Math.round(Number(s));
+      if (!isFinite(n)) n = 1;
+      return { kind: 'challenge', seed: Math.max(1, Math.min(150, n)) };
+    }
+    var id = Math.round(Number(value));
+    return { kind: 'level', id: isFinite(id) && id >= 1 ? id : 1 };
+  }
+
+  function headerText(level) {
+    if (!level) return '';
+    if (level.chapter === 'challenge') return 'Challenge ' + level.seed + ' (seed ' + level.seed + ')';
+    return 'Level ' + level.id + ': ' + level.name;
+  }
+
   var ARENA_PAD = 14;        // CSS px between the canvas edge and the level drawing
   var ARENA_MIN_H = 300;
 
@@ -118,6 +155,10 @@
     fitTransform: fitTransform,
     statusLine: statusLine,
     resultView: resultView,
+    levelOptions: levelOptions,
+    parseLevelKey: parseLevelKey,
+    headerText: headerText,
+    CHALLENGE_VALUE: CHALLENGE_VALUE,
     arenaHeight: arenaHeight,
     lineDiff: lineDiff,
     COACH_FRAME_MS: 12
@@ -236,9 +277,25 @@
   }
 
   // ---- simulation control ----------------------------------------------
-  function loadLevel(id) {
-    app.levelId = id;
-    app.level = L.levels.getLevel(id);
+  // key: { kind: 'level', id } or { kind: 'challenge', seed }
+  function loadLevel(key) {
+    if (typeof key !== 'object' || !key) key = parseLevelKey(key);
+    if (key.kind === 'challenge') {
+      var def = L.gen.generate(key.seed);
+      // Built levels do not carry the seed; keep it for the header.
+      app.level = Object.assign(L.levels.buildLevel(def), { seed: def.seed, chapter: 'challenge', facts: def.facts });
+      app.layouts = [app.level];
+      app.seed = def.seed;
+      el.seed.value = String(def.seed);
+      el.level.value = CHALLENGE_VALUE;
+    } else {
+      app.level = L.levels.getLevel(key.id);
+      app.layouts = L.levels.getLayouts(app.level.id);
+      el.level.value = String(app.level.id);
+    }
+    app.levelId = app.level.id;
+    el.seedRow.hidden = key.kind !== 'challenge';
+    el.levelTitle.textContent = headerText(app.level);
     el.hint.textContent = app.level.hint || '';
     app.arena = null;
     sizeArena();
@@ -338,7 +395,8 @@
       't ' + f(st.t, 1) + ' s   speed ' + f(Math.abs(st.v), 2) + ' m/s   current ' + f(st.current, 2) +
       ' A   battery ' + f(st.Vt, 2) + ' V\n' +
       'sensor ' + f(st.sensor, 2) + ' m   wall-ahead ' + (st.sensor < C.WALL_AHEAD_DIST ? 'YES' : 'no') +
-      '   slip ' + slip + (st.stallTime >= C.STALL_TIME ? '   STALLED' : '');
+      '   slip ' + slip + '   power ' + f((st.power || 1) * 100, 0) + '%' +
+      (st.bumper ? '   BUMPER' : '') + (st.stallTime >= C.STALL_TIME ? '   STALLED' : '');
   }
 
   // ---- main loop --------------------------------------------------------
@@ -958,13 +1016,28 @@
     el.batteryFill = $('battery-fill');
     el.batteryPct = $('battery-pct');
 
+    el.seed = $('seed');
+    el.seedRow = $('seed-row');
+    el.levelTitle = $('level-title');
+
     var opts = hashOptions();
-    L.levels.LEVELS.forEach(function (def) {
-      var o = document.createElement('option');
-      o.value = String(def.id);
-      o.textContent = def.id + '. ' + def.name;
-      el.level.appendChild(o);
+    levelOptions(L.levels.CHAPTERS, L.levels.ALL_LEVELS).forEach(function (g) {
+      var og = document.createElement('optgroup');
+      og.label = g.label;
+      g.options.forEach(function (op) {
+        var o = document.createElement('option');
+        o.value = op.value;
+        o.textContent = op.label;
+        og.appendChild(o);
+      });
+      el.level.appendChild(og);
     });
+    app.seed = 1;
+    function loadSeed(s) { loadLevel({ kind: 'challenge', seed: L.gen.clampSeed(s) }); }
+    el.seed.addEventListener('change', function () { loadSeed(el.seed.value); });
+    $('seed-prev').addEventListener('click', function () { loadSeed(app.seed <= 1 ? 150 : app.seed - 1); });
+    $('seed-next').addEventListener('click', function () { loadSeed(app.seed >= 150 ? 1 : app.seed + 1); });
+    app.loadSeed = loadSeed;
 
     el.code.value = typeof opts.code === 'string' ? opts.code : EXAMPLE_PROGRAM;
     el.code.addEventListener('input', function () { app.errorLines = []; app.fixLines = []; updateGutter(); });
@@ -976,7 +1049,7 @@
 
     el.run.addEventListener('click', run);
     el.reset.addEventListener('click', function () { reset(); showMessage(''); });
-    el.level.addEventListener('change', function () { loadLevel(+el.level.value); });
+    el.level.addEventListener('change', function () { loadLevel(parseLevelKey(el.level.value, app.seed)); });
 
     var speedButtons = document.querySelectorAll('[data-speed]');
     function setSpeed(v) {
@@ -992,10 +1065,9 @@
     });
     setSpeed(opts.speed ? +opts.speed : 1);
 
-    var startLevel = +opts.level || 1;
-    el.level.value = String(L.levels.getLevel(startLevel).id);
     app.graph = setupCanvas(el.graph, el.graph.parentNode.clientWidth || 380, 320);
-    loadLevel(+el.level.value);
+    // #level=4, #level=challenge&seed=75 or #level=c75
+    loadLevel(parseLevelKey(opts.level || '1', opts.seed));
 
     boot('autorun' in opts || 'skipboot' in opts);
     if ('autorun' in opts && run()) {

@@ -45,3 +45,9 @@ Running log of the autonomous build. One entry per task: what was done, test cou
 
 - Seeds 5, 20, ..., 140 with the last forward halved: the coach finds a fix for all 10; each fix parses, passes and has 1 or 2 edits; each search stays within 3000 candidates. The whole test takes about 5.6 s (target 15 s).
 - Tests: 276 pass (suite about 15 s).
+
+## Task 30: level picker and Challenge seed picker
+
+- The level select has chapter optgroups plus "Challenge mode"; a seed row (number field 1 to 150, PREV, NEXT that wrap around) appears in Challenge mode; the arena header shows "Level N: Name" or "Challenge N (seed N)"; the readout shows power and BUMPER. Hash support: `#level=4`, `#level=c75`, `#level=challenge&seed=75`. Help was done in Part 1.
+- Fixed: the readout line ran past the panel border when slip, BUMPER and STALLED all showed; it now wraps.
+- Tests: 280 pass.

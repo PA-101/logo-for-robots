@@ -131,6 +131,15 @@ select {
   margin-left: 6px;
 }
 .hint { margin: 0 0 8px; color: var(--muted); min-height: 1.4em; }
+.level-title { margin: 4px 0 2px; font-size: 18px; letter-spacing: 0.04em; }
+.seed-row { display: flex; align-items: center; gap: 8px; margin: 6px 0 2px; }
+.seed-row[hidden] { display: none; }
+.seed-row input {
+  width: 5em; font: inherit; color: var(--fg); background: var(--bg);
+  border: 1px solid var(--fg); padding: 2px 6px;
+}
+optgroup { color: var(--muted); font-style: normal; }
+option { color: var(--fg); }
 
 .screen { position: relative; line-height: 0; border: 1px solid var(--dim); }
 .screen canvas { display: block; width: 100%; height: auto; background: #030603; }
@@ -155,7 +164,7 @@ select {
 .status .pass { color: var(--fg); }
 .status .fail { color: var(--fail); text-shadow: none; }
 .status .warn { color: var(--warn); text-shadow: none; }
-.readout { color: var(--muted); font-size: 15px; white-space: pre; min-height: 2.8em; }
+.readout { color: var(--muted); font-size: 15px; white-space: pre-wrap; overflow-wrap: anywhere; min-height: 2.8em; }
 
 /* ---- telemetry and battery ------------------------------------------ */
 .battery { margin: 12px 0 16px; }

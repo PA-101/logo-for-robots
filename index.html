@@ -68,6 +68,13 @@
           <select id="level"></select>
         </label>
       </div>
+      <div id="seed-row" class="seed-row" hidden>
+        <label class="label" for="seed">SEED</label>
+        <input id="seed" type="number" min="1" max="150" step="1" value="1">
+        <button id="seed-prev" type="button" class="btn small">PREV</button>
+        <button id="seed-next" type="button" class="btn small">NEXT</button>
+      </div>
+      <p id="level-title" class="level-title"></p>
       <p id="level-hint" class="hint"></p>
       <div class="screen">
         <canvas id="arena" width="600" height="420" aria-label="Robot arena"></canvas>

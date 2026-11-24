@@ -278,3 +278,40 @@ test('the commands help lists every command with an example', () => {
     assert.ok(r.ok || m[1].startsWith(';'), m[1] + ': ' + JSON.stringify(r.errors));
   }
 });
+
+// ---- level picker (task 30) ----------------------------------------------------
+const { levelOptions, parseLevelKey, headerText, CHALLENGE_VALUE } = require('../ui.js');
+const levelsMod = require('../levels.js');
+const genMod = require('../gen.js');
+
+test('level picker groups the 9 levels by chapter and ends with Challenge mode', () => {
+  const groups = levelOptions(levelsMod.CHAPTERS, levelsMod.ALL_LEVELS);
+  assert.deepStrictEqual(groups.map((g) => g.label), ['Chapter 1: Basics', 'Chapter 2: Grip and Power', 'Chapter 3: Bumpers', 'Challenge']);
+  assert.deepStrictEqual(groups.slice(0, 3).map((g) => g.options.map((o) => o.value)), [['1', '2', '3'], ['4', '5', '6'], ['7', '8', '9']]);
+  assert.strictEqual(groups[0].options[0].label, '1. First Steps');
+  assert.deepStrictEqual(groups[3].options.map((o) => o.value), [CHALLENGE_VALUE]);
+});
+
+test('picker values and hash values map to levels and clamped seeds', () => {
+  assert.deepStrictEqual(parseLevelKey('4'), { kind: 'level', id: 4 });
+  assert.deepStrictEqual(parseLevelKey('x'), { kind: 'level', id: 1 });
+  assert.deepStrictEqual(parseLevelKey(CHALLENGE_VALUE, 75), { kind: 'challenge', seed: 75 });
+  assert.deepStrictEqual(parseLevelKey(CHALLENGE_VALUE, '999'), { kind: 'challenge', seed: 150 });
+  assert.deepStrictEqual(parseLevelKey(CHALLENGE_VALUE, 'abc'), { kind: 'challenge', seed: 1 });
+  assert.deepStrictEqual(parseLevelKey('c150'), { kind: 'challenge', seed: 150 });
+  assert.deepStrictEqual(parseLevelKey('C0'), { kind: 'challenge', seed: 1 });
+});
+
+test('the header names the level, or the challenge and its seed', () => {
+  assert.strictEqual(headerText(levelsMod.getLevel(6)), 'Level 6: Black Ice');
+  const def = genMod.generate(17);
+  const built = Object.assign(levelsMod.buildLevel(def), { seed: def.seed, chapter: 'challenge' });
+  assert.strictEqual(headerText(built), 'Challenge 17 (seed 17)');
+  assert.strictEqual(headerText(null), '');
+});
+
+test('the page has the seed row with a 1 to 150 number field and PREV / NEXT buttons', () => {
+  assert.ok(/<input id="seed" type="number" min="1" max="150"/.test(html));
+  assert.ok(html.includes('id="seed-prev"') && html.includes('id="seed-next"'));
+  assert.ok(html.includes('id="level-title"'));
+});
