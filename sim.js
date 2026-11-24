@@ -36,7 +36,11 @@
     TURN_SLOW_DUTY: 0.3,
     STALL_SPEED: 0.02,        // m/s
     STALL_TIME: 0.5,          // s
-    SAMPLE_EVERY: 6           // steps per telemetry sample (10 Hz)
+    SAMPLE_EVERY: 6,          // steps per telemetry sample (10 Hz)
+    STALL_DUTY: 0.2,          // a wheel counts as "commanded" above STALL_DUTY * power
+    BUMPER_COS: 0.5,          // bumper pressed by contacts within 60 degrees of straight ahead
+    UNTIL_BUMP_TIMEOUT: 15,   // s, longest until-bump drive
+    UNTIL_BUMP_SETTLE_MAX: 2  // s, longest until-bump braking; 17 s hard limit in total
   };
   C.N_WHEEL = C.MASS * C.G / 2;                 // normal force per wheel
   C.V_NL = C.WHEEL_R * C.V_FULL / C.KE;         // no-load speed on a full battery
@@ -115,7 +119,10 @@
       current: 0, draw: 0,
       slipL: false, slipR: false,
       contact: false, sensor: C.SENSOR_RANGE,
-      stallTime: 0, programDone: false
+      stallTime: 0, programDone: false,
+      power: 1,          // drive power, 0.1 to 1 (power 10 to 100)
+      bumper: false,     // front bumper pressed this step
+      bumped: false      // latched: wall contact began since the last "if bumped"
     };
 
     var events = [];
@@ -180,10 +187,23 @@
             }
             continue;
           case 'if':
-            if (Array.isArray(node.body) && stack.length < 64 && wallAhead()) {
+            if (node.cond === 'bumped') {
+              // Reading the flag clears it.
+              var wasBumped = state.bumped;
+              state.bumped = false;
+              if (Array.isArray(node.body) && stack.length < 64 && wasBumped) {
+                stack.push({ nodes: node.body, i: 0, remaining: 1 });
+              }
+            } else if (Array.isArray(node.body) && stack.length < 64 && wallAhead()) {
               stack.push({ nodes: node.body, i: 0, remaining: 1 });
             }
             continue;
+          case 'power':
+            // Takes no time: the next command starts in this same step.
+            state.power = Math.max(0.1, Math.min(1, n / 100));
+            continue;
+          case 'until-bump':
+            return { kind: 'bump', elapsed: 0, braking: false, brakeTime: 0, line: node.line };
           case 'forward':
           case 'back':
             return { kind: 'move', d: node.type === 'forward' ? 1 : -1, target: n / 100, done: 0, braking: false };
@@ -208,15 +228,31 @@
         rem = cmd.target - cmd.done;
         if (!cmd.braking && rem <= C.BRAKE_TAU * Math.abs(state.v) + 0.005) cmd.braking = true;
         if (cmd.braking) return settled ? null : [0, 0];
-        return [cmd.d * C.CRUISE_DUTY, cmd.d * C.CRUISE_DUTY];
+        return [cmd.d * C.CRUISE_DUTY * state.power, cmd.d * C.CRUISE_DUTY * state.power];
       }
       if (cmd.kind === 'turn') {
         cmd.done += cmd.d * state.w * C.DT;
         rem = cmd.target - cmd.done;
         if (!cmd.braking && rem <= C.TURN_BRAKE_TAU * Math.abs(state.w) + 0.01) cmd.braking = true;
         if (cmd.braking) return settled ? null : [0, 0];
-        var td = rem < C.TURN_SLOW_ZONE ? C.TURN_SLOW_DUTY : C.TURN_DUTY;
+        var td = (rem < C.TURN_SLOW_ZONE ? C.TURN_SLOW_DUTY : C.TURN_DUTY) * state.power;
         return [-cmd.d * td, cmd.d * td];
+      }
+      if (cmd.kind === 'bump') {
+        if (!cmd.braking) {
+          cmd.elapsed += C.DT;
+          if (state.bumper) {
+            cmd.braking = true;                       // the bumper touched: cut the motors
+          } else if (cmd.elapsed >= C.UNTIL_BUMP_TIMEOUT - 1e-9) {
+            addEvent({ type: 'bump_timeout', t: state.t, line: cmd.line, elapsed: cmd.elapsed });
+            cmd.braking = true;
+          } else {
+            return [C.CRUISE_DUTY * state.power, C.CRUISE_DUTY * state.power];
+          }
+        }
+        // Braking is capped too, so until-bump always ends within 17 s.
+        cmd.brakeTime += C.DT;
+        return settled || cmd.brakeTime >= C.UNTIL_BUMP_SETTLE_MAX - 1e-9 ? null : [0, 0];
       }
       cmd.left -= C.DT;
       return cmd.left <= 0 ? null : [0, 0];
@@ -325,7 +361,7 @@
 
       // 6. walls
       var wasContact = state.contact;
-      var touching = false, impact = 0;
+      var touching = false, impact = 0, front = false;
       for (var pass = 0; pass < 3; pass++) {
         var moved = false;
         for (var k = 0; k < walls.length; k++) {
@@ -333,6 +369,8 @@
           if (!o) continue;
           moved = true;
           touching = true;
+          // Bumper: the wall is within 60 degrees of straight ahead (n points from wall to robot).
+          if (o.nx * Math.cos(state.theta) + o.ny * Math.sin(state.theta) < -C.BUMPER_COS) front = true;
           state.x += o.nx * o.pen;
           state.y += o.ny * o.pen;
           var cs = Math.cos(state.theta), sn = Math.sin(state.theta);
@@ -351,10 +389,13 @@
       if (touching && !wasContact && impact > 0.05) {
         addEvent({ type: 'collision', t: state.t, speed: impact });
       }
+      // 6b. bumper and the latched bumped flag (any contact start, any speed)
+      state.bumper = front;
+      if (touching && !wasContact) state.bumped = true;
 
       // 7. stall detection
       state.current = current;
-      if (touching && Math.max(Math.abs(state.uL), Math.abs(state.uR)) > 0.2 && Math.abs(state.v) < C.STALL_SPEED) {
+      if (touching && Math.max(Math.abs(state.uL), Math.abs(state.uR)) > C.STALL_DUTY * state.power && Math.abs(state.v) < C.STALL_SPEED) {
         state.stallTime += DT;
         if (stallEv) {
           stallEv.duration = state.stallTime;

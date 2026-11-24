@@ -51,7 +51,7 @@ Rule for every task below: all existing tests stay green, and `tests/compat.test
 
 - [x] 20. **Parser tests for the new commands.** Unit: each new command parses with its line; `power` at 10, 100, 9.9 and 100.5; a missing number; `until-bump 5` gives its own message; `if bumped` with and without a block; nesting; positions for the new nodes; the old suggestions are unchanged. Property: the existing parser properties re-run with a generator that also emits the new commands (never throws, valid shape, `countCommands` matches, deterministic). _Requirements: 9.5, 1.10, 1.11_
 
-- [ ] 21. **Simulation: power and bumper.** In `sim.js`: `power` state and scaled duties, the stall threshold `STALL_DUTY * power`, the bumper, the bumped flag, `if bumped`, the bump drive with `UNTIL_BUMP_TIMEOUT` and the `bump_timeout` event. New state keys `power`, `bumper`, `bumped`. _Requirements: 9.1 to 9.4, 10.1 to 10.7, 2.11_
+- [x] 21. **Simulation: power and bumper.** In `sim.js`: `power` state and scaled duties, the stall threshold `STALL_DUTY * power`, the bumper, the bumped flag, `if bumped`, the bump drive with `UNTIL_BUMP_TIMEOUT` and the `bump_timeout` event. New state keys `power`, `bumper`, `bumped`. _Requirements: 9.1 to 9.4, 10.1 to 10.7, 2.11_
 
 - [ ] 22. **Simulation tests for power and bumper.** Unit:
   - The required slip test: floor friction 0.25, `forward 100` at power 100 records slip events, and `power 50` then `forward 100` records none.
