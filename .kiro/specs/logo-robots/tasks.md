@@ -26,6 +26,6 @@ Build in this order. Each task is small, ends with a passing `node --test tests/
 
 - [x] 12. **UI shell (`ui.js`, `index.html`, `style.css`).** Editor with example program, level selector, Run, Reset, speed control (0.5x, 1x, 2x, 4x), parse errors shown with line numbers, fixed-timestep accumulator loop, arena canvas drawing (walls, slick cells, goal, robot, sensor ray, trail). Editor locked while running. _Requirements: 1.1, 1.10, 1.12, 2.1, 3.6, 6.1 to 6.4_
 
-- [ ] 13. **Telemetry graph and "Why did it fail?" panel.** Graph canvas with reserved margins for axes and legend (speed green, current amber, battery dashed), cleared on Reset; panel with PASS/FAIL result and the explain text; amber and red styling with text labels. _Requirements: 4.2, 4.3, 4.4, 5.1 to 5.8_
+- [x] 13. **Telemetry graph and "Why did it fail?" panel.** Graph canvas with reserved margins for axes and legend (speed green, current amber, battery dashed), cleared on Reset; panel with PASS/FAIL result and the explain text; amber and red styling with text labels. _Requirements: 4.2, 4.3, 4.4, 5.1 to 5.8_
 
 - [ ] 14. **Final check and README.** Manual walkthrough of all 3 levels by double-clicking `index.html` in a current browser (pass each with its reference program; trigger stall, battery flat, slip, timeout and see the panel); check no text overlaps graphics; confirm no DOM use outside `ui.js` with a grep test; finish `README.md`. _Requirements: 7.1 to 7.3_

@@ -190,7 +190,8 @@
       setStatus('fail', 'PROGRAM ERROR. Fix the line shown on the left.');
       return false;
     }
-    showMessage(L.lang.countCommands(parsed.program) + ' commands ready.');
+    var count = L.lang.countCommands(parsed.program);
+    showMessage(count + (count === 1 ? ' command' : ' commands') + ' ready.');
     reset();
     app.sim = L.sim.createSim(app.level, parsed.program);
     app.tel.record(app.sim.state, 0);
@@ -277,6 +278,7 @@
   }
 
   function draw() {
+    fitCanvases();
     drawArena();
     drawGraph();
     updateBattery();
@@ -341,10 +343,10 @@
       if (age > 4) return;
       ctx.globalAlpha = 0.75 * (1 - age / 4);
       ctx.strokeStyle = COLORS.warn;
-      ctx.lineWidth = 3 * px;
+      ctx.lineWidth = 5 * px;
       ctx.beginPath();
-      ctx.moveTo(k.x - Math.cos(k.theta) * 0.015, k.y - Math.sin(k.theta) * 0.015);
-      ctx.lineTo(k.x + Math.cos(k.theta) * 0.015, k.y + Math.sin(k.theta) * 0.015);
+      ctx.moveTo(k.x - Math.cos(k.theta) * 0.03, k.y - Math.sin(k.theta) * 0.03);
+      ctx.lineTo(k.x + Math.cos(k.theta) * 0.03, k.y + Math.sin(k.theta) * 0.03);
       ctx.stroke();
     });
     ctx.globalAlpha = 1;
@@ -495,10 +497,185 @@
     ctx.restore();
   }
 
-  // ---- task 13: graph, battery gauge, failure panel ---------------------
-  function drawGraph() {}
-  function updateBattery() {}
-  function renderWhy() {}
+  // ---- telemetry graph --------------------------------------------------
+  // Three stacked strips (speed, current, battery). Labels live in the left and bottom
+  // margins, so no text is drawn over the plotted lines.
+  var GRAPH = { left: 92, right: 10, top: 8, bottom: 26, gap: 12, font: '14px ' + 'Consolas, "Cascadia Mono", "Courier New", monospace' };
+
+  function niceStep(span) {
+    var raw = span / 5;
+    var p = Math.pow(10, Math.floor(Math.log10(raw)));
+    var m = raw / p;
+    return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 5 ? 5 : 10) * p;
+  }
+
+  function drawGraph() {
+    var G = app.graph, ctx = G.ctx;
+    var samples = app.tel.samples;
+    var b = L.telemetry.plotBounds(samples);
+    // Use the level time limit as the time axis so the graph shows the whole time budget.
+    var tMin = 0, tMax = Math.max(app.level.timeLimit || 0, b.tMax);
+    ctx.setTransform(G.dpr, 0, 0, G.dpr, 0, 0);
+    ctx.fillStyle = COLORS.bg;
+    ctx.fillRect(0, 0, G.w, G.h);
+    ctx.font = GRAPH.font;
+    ctx.textBaseline = 'middle';
+
+    var x0 = GRAPH.left, x1 = G.w - GRAPH.right;
+    var stripH = (G.h - GRAPH.top - GRAPH.bottom - 2 * GRAPH.gap) / 3;
+    var X = function (t) { return x0 + (t - tMin) / (tMax - tMin) * (x1 - x0); };
+    var stalledNow = app.sim.state.stallTime >= C.STALL_TIME && app.running;
+    var blink = Math.floor(Date.now() / 160) % 2 === 0;
+
+    var strips = [
+      { name: 'SPEED', unit: 'm/s', key: 'speed', max: b.speedMax, color: COLORS.fg, digits: 1 },
+      { name: 'CURRENT', unit: 'A', key: 'current', max: b.currentMax, color: COLORS.warn, digits: 1,
+        alarm: stalledNow && blink },
+      { name: 'BATTERY', unit: '%', key: 'charge', max: 1, color: COLORS.fg, dashed: true, digits: 0, scale: 100 }
+    ];
+
+    strips.forEach(function (s, idx) {
+      var top = GRAPH.top + idx * (stripH + GRAPH.gap), bottom = top + stripH;
+      var Y = function (v) { return bottom - Math.max(0, Math.min(1, v / s.max)) * stripH; };
+
+      // frame and a faint middle line
+      ctx.strokeStyle = s.alarm ? COLORS.fail : COLORS.dim;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x0 + 0.5, top + 0.5, x1 - x0 - 1, stripH - 1);
+      ctx.strokeStyle = COLORS.grid;
+      ctx.beginPath();
+      ctx.moveTo(x0 + 1, Math.round((top + bottom) / 2) + 0.5);
+      ctx.lineTo(x1 - 1, Math.round((top + bottom) / 2) + 0.5);
+      ctx.stroke();
+
+      // labels in the left margin: name, unit, and the axis range
+      ctx.textAlign = 'left';
+      ctx.fillStyle = s.alarm ? COLORS.fail : s.color;
+      ctx.fillText(s.name, 4, top + 9);
+      ctx.fillStyle = '#7fd99a';
+      ctx.fillText(s.unit, 4, top + 27);
+      ctx.textAlign = 'right';
+      ctx.fillText(L.explain.fmt(s.max * (s.scale || 1), s.digits), x0 - 6, top + 9);
+      ctx.fillText('0', x0 - 6, bottom - 8);
+
+      // the series, clipped to the strip
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(x0 + 1, top + 1, x1 - x0 - 2, stripH - 2);
+      ctx.clip();
+      if (s.key === 'speed') {
+        // amber ticks along the bottom where a wheel slipped
+        ctx.fillStyle = COLORS.warn;
+        samples.forEach(function (p) { if (p.slip) ctx.fillRect(X(p.t) - 1, bottom - 7, 3, 6); });
+      }
+      ctx.lineWidth = 2;
+      ctx.lineJoin = 'round';
+      ctx.setLineDash(s.dashed ? [6, 4] : []);
+      ctx.shadowColor = s.color;
+      ctx.shadowBlur = 4;
+      // Draw runs of same-coloured samples as one path, so dashes stay continuous.
+      // The motor-current line turns red while the robot is stalled, and flashes while it lasts.
+      var colorOf = function (p) { return s.key === 'current' && (p.stall || s.alarm) ? COLORS.fail : s.color; };
+      var i = 1;
+      while (i < samples.length) {
+        var col = colorOf(samples[i]);
+        ctx.strokeStyle = col;
+        ctx.shadowColor = col;
+        ctx.beginPath();
+        ctx.moveTo(X(samples[i - 1].t), Y(samples[i - 1][s.key]));
+        while (i < samples.length && colorOf(samples[i]) === col) {
+          ctx.lineTo(X(samples[i].t), Y(samples[i][s.key]));
+          i++;
+        }
+        ctx.stroke();
+      }
+      ctx.restore();
+      ctx.setLineDash([]);
+    });
+
+    // time axis in the bottom margin
+    var axisY = G.h - GRAPH.bottom + 6;
+    var step = niceStep(tMax - tMin);
+    ctx.fillStyle = '#7fd99a';
+    ctx.strokeStyle = COLORS.dim;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    for (var t = 0; t <= tMax + 1e-9; t += step) {
+      var x = Math.round(X(t)) + 0.5;
+      ctx.beginPath();
+      ctx.moveTo(x, axisY - 6);
+      ctx.lineTo(x, axisY - 2);
+      ctx.stroke();
+      if (x < x1 - 20) ctx.fillText(String(Math.round(t)), x, axisY);
+    }
+    ctx.textAlign = 'right';
+    ctx.fillText('s', x1, axisY);
+    ctx.textAlign = 'left';
+    ctx.fillText('time', 4, axisY);
+  }
+
+  // ---- battery gauge ----------------------------------------------------
+  function updateBattery() {
+    var st = app.sim.state;
+    var pct = Math.max(0, Math.min(1, st.soc)) * 100;
+    var kind = pct < 10 ? 'fail' : pct < 30 ? 'warn' : '';
+    el.batteryFill.style.width = pct.toFixed(1) + '%';
+    el.batteryFill.className = 'battery-fill' + (kind ? ' ' + kind : '');
+    el.batteryPct.className = 'battery-pct' + (kind ? ' ' + kind : '');
+    el.batteryPct.textContent = (kind === 'fail' ? 'LOW ' : kind === 'warn' ? 'WARN ' : '') +
+      L.explain.fmt(pct, 0) + '%  ' + L.explain.fmt(st.Vt, 2) + ' V';
+  }
+
+  // ---- "Why did it fail?" panel ----------------------------------------
+  function renderWhy(sim) {
+    var box = el.why;
+    box.textContent = '';
+    box.classList.remove('flash', 'flash-pass');
+    if (!sim) {
+      var idle = document.createElement('p');
+      idle.className = 'idle';
+      idle.textContent = 'Run a program. If it fails, the reason appears here, with numbers from the run.';
+      box.appendChild(idle);
+      return;
+    }
+    var r = L.explain.explain({ result: sim.result, events: sim.events, state: sim.state, level: app.level });
+    var head = document.createElement('p');
+    head.className = 'verdict ' + (r.verdict === 'PASS' ? 'pass' : 'fail');
+    head.textContent = r.verdict + (r.verdict === 'FAIL' ? ': ' + r.title : '');
+    box.appendChild(head);
+    if (r.verdict === 'PASS' || r.causes.length > 1 || !r.causes.length) {
+      var sum = document.createElement('p');
+      sum.className = 'summary';
+      sum.textContent = r.summary;
+      box.appendChild(sum);
+    }
+    if (r.causes.length) {
+      var ol = document.createElement('ol');
+      r.causes.forEach(function (c) {
+        var li = document.createElement('li');
+        var tag = document.createElement('span');
+        tag.className = c.root ? 'root' : 'tag';
+        tag.textContent = (c.root ? 'LIKELY ROOT CAUSE' : 'ALSO') + ' at ' + L.explain.fmt(c.t, 1) + ' s';
+        li.appendChild(tag);
+        li.appendChild(document.createTextNode(c.text));
+        ol.appendChild(li);
+      });
+      box.appendChild(ol);
+    }
+    void box.offsetWidth; // restart the highlight animation
+    box.classList.add(r.verdict === 'PASS' ? 'flash-pass' : 'flash');
+  }
+
+  // Keeps canvas pixel sizes matched to their containers (layout can change after load).
+  function fitCanvases() {
+    var gw = el.graph.parentNode.clientWidth;
+    if (gw && Math.abs(gw - app.graph.w) > 0.5) app.graph = setupCanvas(el.graph, gw, app.graph.h);
+    var aw = el.arena.parentNode.clientWidth;
+    if (aw && Math.abs(aw - app.arena.w) > 0.5) {
+      var aspect = app.level.height / app.level.width;
+      app.arena = setupCanvas(el.arena, aw, Math.round(Math.max(260, Math.min(440, aw * aspect + 40))));
+    }
+  }
 
   // ---- boot animation ---------------------------------------------------
   function boot(skip) {
@@ -569,7 +746,7 @@
 
     var startLevel = +opts.level || 1;
     el.level.value = String(L.levels.getLevel(startLevel).id);
-    app.graph = setupCanvas(el.graph, el.graph.parentNode.clientWidth || 380, 300);
+    app.graph = setupCanvas(el.graph, el.graph.parentNode.clientWidth || 380, 320);
     loadLevel(+el.level.value);
 
     boot('autorun' in opts || 'skipboot' in opts);
