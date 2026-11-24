@@ -47,7 +47,7 @@ Rule for every task below: all existing tests stay green, and `tests/compat.test
 
 ### Language and physics
 
-- [ ] 19. **Golden runs, then the parser.** First, with today's code, write `scripts/record-golden.js` and commit `tests/fixtures/golden-runs.json` plus `tests/compat.test.js` (design section 12). Then add `power N`, `until-bump` and `if bumped` to `lang.js`: limits, messages, keyword suggestions, `countCommands`, positions. _Requirements: 9.1, 9.5, 10.2, 10.6, 1.10_
+- [x] 19. **Golden runs, then the parser.** First, with today's code, write `scripts/record-golden.js` and commit `tests/fixtures/golden-runs.json` plus `tests/compat.test.js` (design section 12). Then add `power N`, `until-bump` and `if bumped` to `lang.js`: limits, messages, keyword suggestions, `countCommands`, positions. _Requirements: 9.1, 9.5, 10.2, 10.6, 1.10_
 
 - [ ] 20. **Parser tests for the new commands.** Unit: each new command parses with its line; `power` at 10, 100, 9.9 and 100.5; a missing number; `until-bump 5` gives its own message; `if bumped` with and without a block; nesting; positions for the new nodes; the old suggestions are unchanged. Property: the existing parser properties re-run with a generator that also emits the new commands (never throws, valid shape, `countCommands` matches, deterministic). _Requirements: 9.5, 1.10, 1.11_
 

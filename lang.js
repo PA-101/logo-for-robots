@@ -11,13 +11,17 @@
     MAX_WAIT: 60,        // seconds
     MAX_DEPTH: 8,        // nested [ ] blocks
     MAX_TEXT: 5000,      // characters
-    MAX_COMMANDS: 2000   // executed commands after expanding repeats
+    MAX_COMMANDS: 2000,  // executed commands after expanding repeats
+    MIN_POWER: 10,       // percent
+    MAX_POWER: 100
   };
 
   var MOVES = { forward: LIMITS.MAX_MOVE, back: LIMITS.MAX_MOVE };
   var TURNS = { left: LIMITS.MAX_TURN, right: LIMITS.MAX_TURN };
   var NUMBER_RE = /^\d+(\.\d+)?$/;
-  var KEYWORDS = ['forward', 'back', 'left', 'right', 'repeat', 'if', 'wait'];
+  // New keywords go last, so ties in "did you mean" keep their old answers.
+  var KEYWORDS = ['forward', 'back', 'left', 'right', 'repeat', 'if', 'wait', 'power', 'until-bump'];
+  var CONDITIONS = { 'wall-ahead': true, bumped: true };
   var SATURATE = 1e9;
 
   function ParseError(line, message) {
@@ -105,15 +109,19 @@
 
     function readNumber(keyword, kwTok, example) {
       var tok = peek();
+      var needs = keyword === 'power' ? ' needs a number from 10 to 100, like ' : ' needs a number, like ';
       if (!tok || tok.kind !== 'word') {
-        throw new ParseError(kwTok.line, '"' + keyword + '" needs a number, like ' + example + '.');
+        throw new ParseError(kwTok.line, '"' + keyword + '"' + needs + example + '.');
+      }
+      if (keyword === 'power' && /^-\d/.test(tok.text)) {
+        throw new ParseError(kwTok.line, '"power" must be at least ' + LIMITS.MIN_POWER + ', but I found ' + show(tok.text) + '.');
       }
       if (/^-\d/.test(tok.text)) {
         throw new ParseError(kwTok.line, '"' + keyword + '" cannot use a negative number (' + show(tok.text) +
           '). Use "back" or "right" to go the other way.');
       }
       if (!NUMBER_RE.test(tok.text)) {
-        throw new ParseError(kwTok.line, '"' + keyword + '" needs a number, like ' + example +
+        throw new ParseError(kwTok.line, '"' + keyword + '"' + needs + example +
           '. I found "' + show(tok.text) + '" instead.');
       }
       pos++;
@@ -176,6 +184,21 @@
         checkMax('wait', num, LIMITS.MAX_WAIT, tok.line);
         return at({ type: 'wait', n: num.value, line: tok.line }, tok, num);
       }
+      if (word === 'power') {
+        num = readNumber('power', tok, 'power 50');
+        checkMax('power', num, LIMITS.MAX_POWER, tok.line);
+        if (num.value < LIMITS.MIN_POWER) {
+          throw new ParseError(tok.line, '"power" must be at least ' + LIMITS.MIN_POWER + ', but I found ' + show(num.text) + '.');
+        }
+        return at({ type: 'power', n: num.value, line: tok.line }, tok, num);
+      }
+      if (word === 'until-bump') {
+        var after = peek();
+        if (after && after.kind === 'word' && /^-?\d/.test(after.text)) {
+          throw new ParseError(tok.line, '"until-bump" does not take a number. It drives until the bumper touches a wall.');
+        }
+        return at({ type: 'until-bump', line: tok.line }, tok, null);
+      }
       if (word === 'repeat') {
         num = readNumber('repeat', tok, 'repeat 4 [ forward 50 right 90 ]');
         if (num.value > LIMITS.MAX_REPEAT) checkMax('repeat', num, LIMITS.MAX_REPEAT, tok.line);
@@ -191,15 +214,16 @@
       }
       if (word === 'if') {
         var cond = peek();
-        if (!cond || cond.kind !== 'word' || cond.text.toLowerCase() !== 'wall-ahead') {
-          throw new ParseError(tok.line, '"if" needs a condition. The only one I know is wall-ahead, like: if wall-ahead [ left 90 ]');
+        var condWord = cond && cond.kind === 'word' ? cond.text.toLowerCase() : '';
+        if (!Object.prototype.hasOwnProperty.call(CONDITIONS, condWord)) {
+          throw new ParseError(tok.line, '"if" needs a condition: wall-ahead or bumped, like: if wall-ahead [ left 90 ]');
         }
         pos++;
-        var open2 = expectOpen('"if wall-ahead"', 'condition', tok.line);
+        var open2 = expectOpen('"if ' + condWord + '"', 'condition', tok.line);
         if (depth + 1 > LIMITS.MAX_DEPTH) {
           throw new ParseError(open2.line, 'Blocks are nested too deeply (limit ' + LIMITS.MAX_DEPTH + ').');
         }
-        return at({ type: 'if', cond: 'wall-ahead', body: parseBlock(depth + 1, open2), line: tok.line }, tok, null);
+        return at({ type: 'if', cond: condWord, body: parseBlock(depth + 1, open2), line: tok.line }, tok, null);
       }
       if (NUMBER_RE.test(tok.text)) {
         throw new ParseError(tok.line, 'I expected a command like forward or left, but found the number ' + show(tok.text) + '.');
