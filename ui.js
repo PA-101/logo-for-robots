@@ -38,11 +38,41 @@
     return { s: s, ox: (canvasW - worldW * s) / 2, oy: (canvasH - worldH * s) / 2 };
   }
 
+  // The status line under the arena. Built from the same explain() result as the
+  // "Why did it fail?" panel, so both always name the same root cause.
+  function statusLine(exp, fmt) {
+    var f = typeof fmt === 'function' ? fmt : function (x, d) { return Number(x || 0).toFixed(d); };
+    if (!exp || exp.verdict === 'RUNNING') return { kind: '', text: 'RUNNING...' };
+    if (exp.verdict === 'PASS') return { kind: 'pass', text: 'PASS: ' + exp.summary };
+    var root = exp.causes && exp.causes[0];
+    if (!root) return { kind: 'fail', text: 'FAIL: run failed. See "Why did it fail?"' };
+    return {
+      kind: 'fail',
+      text: 'FAIL: ' + exp.title + ' (root cause, at ' + f(root.t, 1) + ' s). See "Why did it fail?"'
+    };
+  }
+
+  var ARENA_PAD = 14;        // CSS px between the canvas edge and the level drawing
+  var ARENA_MIN_H = 300;
+
+  // Canvas height for the arena: tall enough to draw the level at the full column width,
+  // but no taller (that would only add empty bands) and no taller than the space available.
+  function arenaHeight(canvasW, levelW, levelH, availH) {
+    var s = (canvasW - 2 * ARENA_PAD) / levelW;
+    var needed = Math.ceil(levelH * s + 2 * ARENA_PAD);
+    var room = typeof availH === 'number' && isFinite(availH) ? availH : needed;
+    return Math.max(ARENA_MIN_H, Math.min(needed, Math.floor(room)));
+  }
+
   var api = {
     EXAMPLE_PROGRAM: EXAMPLE_PROGRAM,
     SPEEDS: SPEEDS,
+    ARENA_PAD: ARENA_PAD,
+    ARENA_MIN_H: ARENA_MIN_H,
     framePlan: framePlan,
-    fitTransform: fitTransform
+    fitTransform: fitTransform,
+    statusLine: statusLine,
+    arenaHeight: arenaHeight
   };
 
   if (typeof module !== 'undefined') {
@@ -159,9 +189,8 @@
     app.levelId = id;
     app.level = L.levels.getLevel(id);
     el.hint.textContent = app.level.hint || '';
-    var aspect = app.level.height / app.level.width;
-    var w = el.arena.parentNode.clientWidth || 600;
-    app.arena = setupCanvas(el.arena, w, Math.round(Math.max(260, Math.min(440, w * aspect + 40))));
+    app.arena = null;
+    sizeArena();
     reset();
   }
 
@@ -232,16 +261,12 @@
     app.running = false;
     app.ended = true;
     lockEditor(false);
-    var r = app.sim.result;
-    if (r.status === 'pass') setStatus('pass', 'PASS: goal reached in ' + L.explain.fmt(app.sim.state.t, 1) + ' s.');
-    else setStatus('fail', 'FAIL: ' + failLabel(r.reason) + '. See "Why did it fail?"');
-    renderWhy(app.sim);
-  }
-
-  function failLabel(reason) {
-    return {
-      battery_flat: 'battery ran flat', timeout: 'out of time', program_ended: 'program ended before the goal'
-    }[reason] || 'run failed';
+    var sim = app.sim;
+    // One explanation feeds both the status line and the panel.
+    var exp = L.explain.explain({ result: sim.result, events: sim.events, state: sim.state, level: app.level });
+    var line = statusLine(exp, L.explain.fmt);
+    setStatus(line.kind, line.text);
+    renderWhy(sim, exp);
   }
 
   function setStatus(kind, text) {
@@ -287,7 +312,7 @@
   // ---- arena drawing ----------------------------------------------------
   function drawArena() {
     var A = app.arena, ctx = A.ctx, lvl = app.level, st = app.sim.state;
-    var T = fitTransform(lvl.width, lvl.height, A.w, A.h, 14);
+    var T = fitTransform(lvl.width, lvl.height, A.w, A.h, ARENA_PAD);
     var px = 1 / T.s;                       // one CSS pixel in meters
     ctx.setTransform(A.dpr, 0, 0, A.dpr, 0, 0);
     ctx.fillStyle = COLORS.bg;
@@ -627,7 +652,7 @@
   }
 
   // ---- "Why did it fail?" panel ----------------------------------------
-  function renderWhy(sim) {
+  function renderWhy(sim, exp) {
     var box = el.why;
     box.textContent = '';
     box.classList.remove('flash', 'flash-pass');
@@ -638,7 +663,7 @@
       box.appendChild(idle);
       return;
     }
-    var r = L.explain.explain({ result: sim.result, events: sim.events, state: sim.state, level: app.level });
+    var r = exp || L.explain.explain({ result: sim.result, events: sim.events, state: sim.state, level: app.level });
     var head = document.createElement('p');
     head.className = 'verdict ' + (r.verdict === 'PASS' ? 'pass' : 'fail');
     head.textContent = r.verdict + (r.verdict === 'FAIL' ? ': ' + r.title : '');
@@ -670,10 +695,21 @@
   function fitCanvases() {
     var gw = el.graph.parentNode.clientWidth;
     if (gw && Math.abs(gw - app.graph.w) > 0.5) app.graph = setupCanvas(el.graph, gw, app.graph.h);
-    var aw = el.arena.parentNode.clientWidth;
-    if (aw && Math.abs(aw - app.arena.w) > 0.5) {
-      var aspect = app.level.height / app.level.width;
-      app.arena = setupCanvas(el.arena, aw, Math.round(Math.max(260, Math.min(440, aw * aspect + 40))));
+    sizeArena();
+  }
+
+  // Sizes the arena canvas to the column width and the free space down to the bottom of
+  // the window, keeping room for the legend, status and readout below it.
+  function sizeArena() {
+    var screen = el.arena.parentNode, panel = $('arena-panel');
+    var w = screen.clientWidth || 600;
+    var screenRect = screen.getBoundingClientRect();
+    var below = panel.getBoundingClientRect().bottom - screenRect.bottom;  // legend, status, readout
+    var top = screenRect.top + (root.scrollY || 0);
+    var avail = (root.innerHeight || 900) - top - below - 24;
+    var h = arenaHeight(w, app.level.width, app.level.height, avail);
+    if (!app.arena || Math.abs(w - app.arena.w) > 0.5 || Math.abs(h - app.arena.h) > 0.5) {
+      app.arena = setupCanvas(el.arena, w, h);
     }
   }
 

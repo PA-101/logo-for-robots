@@ -95,3 +95,76 @@ test('theme colours from the steering file are used', () => {
   assert.ok(/repeating-linear-gradient\(to bottom/.test(css), 'scanlines');
   assert.ok(/\.screen::after[\s\S]*pointer-events: none/.test(css), 'scanlines only over canvases and never block clicks');
 });
+
+// ---- status line and arena size (UI fixes) ---------------------------------
+const { statusLine, arenaHeight, ARENA_PAD, ARENA_MIN_H } = require('../ui.js');
+const { explain, fmt } = require('../explain.js');
+
+function explainRun(id, text) {
+  const level = getLevel(id);
+  const sim = runToEnd(level, parse(text).program);
+  return explain({ result: sim.result, events: sim.events, state: sim.state, level });
+}
+
+test('status line names the same root cause as the "Why did it fail?" panel', () => {
+  const cases = [
+    [1, 'forward 400'],                                                   // stall first, then battery flat
+    [1, 'wait 30'],                                                       // timeout
+    [1, 'forward 50'],                                                    // stopped short
+    [3, 'forward 200\nright 90\nforward 100\nleft 90\nforward 100'],      // slip, then stopped short
+    [3, 'forward 200\nright 90\nforward 150\nleft 90\nforward 200']       // slip, stall, battery flat
+  ];
+  for (const [id, text] of cases) {
+    const exp = explainRun(id, text);
+    const line = statusLine(exp, fmt);
+    assert.strictEqual(line.kind, 'fail');
+    assert.ok(line.text.startsWith('FAIL: ' + exp.title + ' '), JSON.stringify(text) + ' -> ' + line.text);
+    assert.ok(line.text.includes('root cause, at ' + fmt(exp.causes[0].t, 1) + ' s'), line.text);
+    assert.strictEqual(exp.causes[0].root, true);
+  }
+});
+
+test('regression: driving into a wall reports the stall, not the battery, in the status line', () => {
+  const line = statusLine(explainRun(1, 'forward 400'), fmt);
+  assert.ok(line.text.includes('Stalled against a wall'), line.text);
+  assert.ok(!/battery/i.test(line.text), line.text);
+});
+
+test('status line for a pass and for a run still going', () => {
+  const pass = statusLine(explainRun(1, EXAMPLE_PROGRAM), fmt);
+  assert.strictEqual(pass.kind, 'pass');
+  assert.ok(/^PASS: Reached the goal in \d+\.\d s with \d+% battery left\.$/.test(pass.text), pass.text);
+  assert.deepStrictEqual(statusLine({ verdict: 'RUNNING', causes: [] }), { kind: '', text: 'RUNNING...' });
+  assert.strictEqual(statusLine({ verdict: 'FAIL', title: 'Run failed', causes: [] }).kind, 'fail');
+  assert.doesNotThrow(() => statusLine(null));
+});
+
+test('arena height fits each level at full column width, without empty bands, within the room available', () => {
+  for (const id of [1, 2, 3]) {
+    const l = getLevel(id);
+    for (const w of [590, 640, 700, 900]) {
+      const h = arenaHeight(w, l.width, l.height, 2000);
+      const t = fitTransform(l.width, l.height, w, h, ARENA_PAD);
+      // the drawing is limited by width, so it uses the whole column
+      assert.ok(Math.abs(t.s - (w - 2 * ARENA_PAD) / l.width) < 1e-9 || h === ARENA_MIN_H, 'level ' + id + ' width ' + w);
+      // and the canvas is no more than 1 px taller than the drawing needs
+      assert.ok(h <= Math.max(ARENA_MIN_H, l.height * t.s + 2 * ARENA_PAD + 1), 'level ' + id + ' has empty bands');
+    }
+  }
+});
+
+test('arena height never exceeds the room available, but keeps a usable minimum', () => {
+  forAll(190000, 300, (rng) => {
+    const l = getLevel(rng.int(1, 3));
+    const w = rng.int(400, 1200), avail = rng.int(-100, 1200);
+    const h = arenaHeight(w, l.width, l.height, avail);
+    assert.ok(Number.isInteger(h));
+    assert.ok(h >= ARENA_MIN_H);
+    if (avail >= ARENA_MIN_H) assert.ok(h <= avail, h + ' > ' + avail);
+  });
+  assert.strictEqual(arenaHeight(700, 3.5, 2.5, NaN), Math.ceil(2.5 * (700 - 28) / 3.5 + 28));
+});
+
+test('the arena column takes the spare width', () => {
+  assert.ok(/grid-template-columns: 330px minmax\(640px, 1fr\) 380px/.test(css));
+});

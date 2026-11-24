@@ -34,7 +34,7 @@ h2 { font-size: 16px; color: var(--muted); }
 
 main {
   display: grid;
-  grid-template-columns: 330px 640px 1fr;
+  grid-template-columns: 330px minmax(640px, 1fr) 380px;
   gap: 16px;
   align-items: start;
 }
