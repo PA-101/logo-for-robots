@@ -70,7 +70,7 @@ Rule for every task below: all existing tests stay green, and `tests/compat.test
 
 - [x] 24. **Chapters and layouts in `levels.js`.** `ALL_LEVELS`, `CHAPTERS`, `getLevel(id, layout)`, `buildLevel(def, layout)`, the multi-cell goal rectangle, `powerMatters`, and the 6 new level definitions with the starting values from design section 7b. `LEVELS` stays the 3 chapter 1 levels. _Requirements: 11.1, 11.2, 11.5, 11.6_
 
-- [ ] 25. **Level structure tests.** Every map in every layout is rectangular and closed, with one `S` and a fully filled `G` rectangle; all 3 layouts of a level have the same size and start; chapter grouping and ids; levels 1 to 3 build byte-identical to before; unknown ids still give level 1. _Requirements: 11.1, 11.5, 11.6, 3.2_
+- [x] 25. **Level structure tests.** Every map in every layout is rectangular and closed, with one `S` and a fully filled `G` rectangle; all 3 layouts of a level have the same size and start; chapter grouping and ids; levels 1 to 3 build byte-identical to before; unknown ids still give level 1. _Requirements: 11.1, 11.5, 11.6, 3.2_
 
 - [ ] 26. **Tune chapters 2 and 3, and the level tests.** Tune friction, battery and time like task 8, and record every change (old value, new value, reason) in design section 10. Tests:
   - Every reference passes every layout using at most 75 percent of time and battery.
