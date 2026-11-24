@@ -112,6 +112,35 @@
     return { multi: chips.length > 1, pass: chips.length > 0 && firstFail < 0, focus: firstFail < 0 ? v : firstFail, chips: chips };
   }
 
+  // Judge shortcuts: each loads a level (like the picker) and a starter program that shows that
+  // chapter's lesson when it runs.
+  function shortcutList(levelsApi, genApi) {
+    var lv = levelsApi || (typeof module !== 'undefined' ? require('./levels.js') : root.LFR.levels);
+    var gn = genApi || (typeof module !== 'undefined' ? require('./gen.js') : root.LFR.gen);
+    var noPower = function (t) { return t.split('\n').filter(function (l) { return !/^\s*power\b/.test(l); }).join('\n'); };
+    var halveLast = function (t) {
+      var lines = t.split('\n');
+      for (var i = lines.length - 1; i >= 0; i--) {
+        var m = /^forward (\d+)$/.exec(lines[i]);
+        if (m) { lines[i] = 'forward ' + Math.max(1, Math.round(Number(m[1]) / 2)); break; }
+      }
+      return lines.join('\n');
+    };
+    var challenge = function (seed) {
+      return {
+        label: 'CHALLENGE ' + seed, key: 'c' + seed,
+        starter: '; Challenge ' + seed + ': one leg of this route is too short.\n; Run it, then press SUGGEST A FIX.\n' + halveLast(gn.generate(seed).reference) + '\n'
+      };
+    };
+    return [
+      { label: 'BASICS', key: '1', starter: EXAMPLE_PROGRAM },
+      { label: 'GRIP AND POWER', key: '4', starter: '; Level 4 at full power: watch the wheels slip on the ice.\n; Then press SUGGEST A FIX.\n' + noPower(lv.getLevel(4).reference) + '\n' },
+      { label: 'BUMPERS', key: '7', starter: '; Level 7 with distances measured on layout A.\n; Check the layout chips after the run.\nforward 150\nright 90\nforward 50\n' },
+      challenge(75),
+      challenge(150)
+    ];
+  }
+
   // What the export dialog shows for the editor text: the code, or the first parse error.
   function exportView(text, title, exporter) {
     var ex = exporter || (typeof module !== 'undefined' ? require('./export.js') : root.LFR.exporter);
@@ -197,6 +226,7 @@
     headerText: headerText,
     objectiveView: objectiveView,
     exportView: exportView,
+    shortcutList: shortcutList,
     CHALLENGE_VALUE: CHALLENGE_VALUE,
     arenaHeight: arenaHeight,
     lineDiff: lineDiff,
@@ -1149,6 +1179,25 @@
     updateGutter();
 
     el.run.addEventListener('click', function () { run(); });
+
+    // Judge shortcuts: load the level the same way the picker does, plus a starter program.
+    var sc = $('shortcuts');
+    shortcutList(L.levels, L.gen).forEach(function (s) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'btn small';
+      b.textContent = s.label;
+      b.addEventListener('click', function () {
+        if (app.running || coachBusy()) return;
+        loadLevel(parseLevelKey(s.key));
+        el.code.value = s.starter;
+        app.errorLines = [];
+        app.fixLines = [];
+        updateGutter();
+        showMessage('');
+      });
+      sc.appendChild(b);
+    });
 
     // Export dialog: plain C++ for the program in the editor, with a Copy button.
     var dlg = $('export-dialog'), exCode = $('export-code'), exStatus = $('export-status'), exCopy = $('export-copy');

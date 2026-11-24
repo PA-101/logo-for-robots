@@ -92,3 +92,9 @@ Running log of the autonomous build. One entry per task: what was done, test cou
 - Browser check: the dialog opens with 60 lines for level 1, and the bad-program case works. No page errors.
 - Tests: 298 pass.
 - Not verified: in headless Chrome over file:// the clipboard write was not available, so COPY fell back to "The code is selected. Press Ctrl+C to copy it." The clipboard path on GitHub Pages (https) needs a real click to confirm.
+
+## Task 36: judge shortcuts
+
+- A "JUMP TO" row above the editor: BASICS (level 1, the passing example), GRIP AND POWER (level 4 at full power, which slips and fails), BUMPERS (level 7 with distances from layout A: A PASS, B FAIL, C FAIL), CHALLENGE 75 and CHALLENGE 150 (the reference with the last leg halved, which the coach can fix). Each loads the level exactly as the picker does, then puts the starter in the editor.
+- Tests check the mapping and that each starter behaves as described.
+- Tests: 301 pass.

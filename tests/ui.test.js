@@ -368,3 +368,38 @@ test('the page has the export button and a dialog with read-only code, COPY and 
   assert.ok(html.includes('id="export-copy"') && html.includes('id="export-close"'));
   assert.ok(/uncalibrated/i.test(html.slice(html.indexOf('<dialog'), html.indexOf('</dialog>'))));
 });
+
+// ---- judge shortcuts (task 36) ---------------------------------------------------
+const { shortcutList } = require('../ui.js');
+const coachMod = require('../coach.js');
+
+test('shortcuts: five buttons that load the same level the picker would', () => {
+  const list = shortcutList(levelsMod, genMod);
+  assert.deepStrictEqual(list.map((s) => s.label), ['BASICS', 'GRIP AND POWER', 'BUMPERS', 'CHALLENGE 75', 'CHALLENGE 150']);
+  assert.deepStrictEqual(list.map((s) => parseLevelKey(s.key)), [
+    { kind: 'level', id: 1 }, { kind: 'level', id: 4 }, { kind: 'level', id: 7 },
+    { kind: 'challenge', seed: 75 }, { kind: 'challenge', seed: 150 }]);
+  // the picker uses the same keys: level values are the ids, challenge goes through the seed
+  assert.deepStrictEqual(parseLevelKey(CHALLENGE_VALUE, 75), parseLevelKey('c75'));
+  for (const s of list) assert.strictEqual(parse(s.starter).ok, true, s.label + ' starter parses');
+});
+
+test('shortcut starters show each lesson: basics passes, the others fail in the intended way', () => {
+  const [basics, grip, bumpers, c75, c150] = shortcutList(levelsMod, genMod);
+  assert.strictEqual(runToEnd(levelsMod.getLevel(1), parse(basics.starter).program).result.status, 'pass');
+  const g = runToEnd(levelsMod.getLevel(4), parse(grip.starter).program);
+  assert.strictEqual(g.result.status, 'fail');
+  assert.ok(g.events.some((e) => e.type === 'slip'), 'the full-power run slips');
+  const results = levelsMod.getLayouts(7).map((l) => runToEnd(l, parse(bumpers.starter).program).result.status);
+  assert.deepStrictEqual(results, ['pass', 'fail', 'fail']);
+  for (const [s, seed] of [[c75, 75], [c150, 150]]) {
+    const level = levelsMod.buildLevel(genMod.generate(seed));
+    assert.strictEqual(runToEnd(level, parse(s.starter).program).result.status, 'fail', s.label);
+    const r = coachMod.coach(level, s.starter);
+    assert.strictEqual(r.found, true, s.label + ': the coach can fix the starter');
+  }
+});
+
+test('the page has the shortcut row above the editor', () => {
+  assert.ok(html.indexOf('id="shortcuts"') > 0 && html.indexOf('id="shortcuts"') < html.indexOf('id="code"'));
+});
