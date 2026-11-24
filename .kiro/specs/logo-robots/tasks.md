@@ -20,7 +20,7 @@ Build in this order. Each task is small, ends with a passing `node --test tests/
 
 - [ ] 9. **Simulation property tests.** (a) battery charge never increases and stays between 0 and capacity; (b) the simulation is deterministic: two runs of the same random program on the same level give equal state and event logs (compare with `JSON.stringify`); (c) speed never exceeds the no-load speed `V_NL` and wheel surface speeds stay under it; (d) the robot center is never inside a wall; (e) no NaN or Infinity in any state value; (f) `runToEnd` always terminates within the step limit; (g) forced random duties (test hook) respect all of the above. Programs come from a random valid-program generator. _Requirements: 2.2, 2.6, 2.10, 2.13_
 
-- [ ] 10. **Telemetry (`telemetry.js`) with tests.** Recorder at 10 Hz, ring limit of 1200 samples (drop oldest), `clear`, `plotBounds`. Tests: sample count after N steps, limit holds under property test with random run lengths, bounds always cover the data. _Requirements: 4.1, 4.4, 4.5_
+- [x] 10. **Telemetry (`telemetry.js`) with tests.** Recorder at 10 Hz, ring limit of 1200 samples (drop oldest), `clear`, `plotBounds`. Tests: sample count after N steps, limit holds under property test with random run lengths, bounds always cover the data. _Requirements: 4.1, 4.4, 4.5_
 
 - [ ] 11. **Explain (`explain.js`) with tests.** One test per cause (stall, battery flat, slip, timeout, program ended short), multiple causes ordered earliest first with the root flag, PASS text, and numbers in the text match the event fields exactly. Property test: `explain` never throws on random event logs. _Requirements: 5.1 to 5.8_
 
