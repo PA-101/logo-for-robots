@@ -19,8 +19,8 @@
         '#####G#',
         '#######'
       ],
-      capacity: 20,
-      timeLimit: 20,
+      capacity: 3,
+      timeLimit: 12,
       slickMu: 0.25,
       reference: 'forward 200\nright 90\nforward 100'
     },
@@ -37,8 +37,8 @@
         '#####..G#',
         '#########'
       ],
-      capacity: 10,
-      timeLimit: 40,
+      capacity: 2.5,
+      timeLimit: 25,
       slickMu: 0.25,
       reference: 'repeat 2 [ forward 100 right 90 forward 100 left 90 ]\nforward 100'
     },
@@ -53,8 +53,8 @@
         '#####o...G#',
         '###########'
       ],
-      capacity: 6,
-      timeLimit: 45,
+      capacity: 1.5,
+      timeLimit: 22,
       slickMu: 0.25,
       reference: 'forward 200\nright 90\nforward 100\nleft 90\nforward 200'
     }

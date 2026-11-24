@@ -186,6 +186,17 @@ test('a slipping wheel spins faster than the ground and the robot accelerates mo
   assert.ok(slip.state.v < grip.state.v, 'slipping launch is slower');
 });
 
+test('regression: while slipping, friction never brakes a robot that is driving forward', () => {
+  for (const mu of [0.25, 0.3, 0.4, 0.45]) {
+    const sim = driven(openLevel({ mu }), 0.8);
+    let prev = 0;
+    for (let i = 0; i < 60; i++) {
+      sim.step();
+      assert.ok(sim.state.v >= prev - 1e-12, 'mu ' + mu + ' step ' + i + ': speed fell from ' + prev + ' to ' + sim.state.v);
+      prev = sim.state.v;
+    }
+  }
+});
 test('a slipping wheel grips again once speeds match', () => {
   const sim = driven(openLevel({ mu: 0.4 }), 0.8);
   steps(sim, 240);
@@ -367,8 +378,8 @@ test('running out of time fails with a timeout event holding the limit and dista
   const sim = run(level, 'wait 30');
   assert.deepStrictEqual(sim.result, { status: 'fail', reason: 'timeout' });
   const ev = sim.events.find((e) => e.type === 'timeout');
-  assert.strictEqual(ev.limit, 20);
-  near(ev.t, 20, 0.02);
+  assert.strictEqual(ev.limit, level.timeLimit);
+  near(ev.t, level.timeLimit, 0.02);
   near(ev.distance_to_goal, Math.hypot(2.75 - 0.75, 0.75 - 1.75), 1e-6);
 });
 

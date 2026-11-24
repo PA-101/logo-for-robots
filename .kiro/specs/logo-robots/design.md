@@ -1,6 +1,6 @@
-# Design: Logo for Robots
+﻿# Design: Logo for Robots
 
-All constants below are starting values. Task 8 may tune them, and any change must be made here first.
+Constants below are the values after tuning in task 8. See section 10 for every change from the original starting values.
 
 ## 1. File layout
 
@@ -51,6 +51,10 @@ Script order in `index.html`: `lang.js`, `levels.js`, `sim.js`, `telemetry.js`, 
 | `TURN_DUTY` | | 0.6 | duty per wheel for left/right |
 | `BRAKE_TAU` | | 0.13 s | linear braking time constant (used to start braking early) |
 | `TURN_BRAKE_TAU` | | 0.10 s | yaw braking time constant |
+| `TURN_SLOW_ZONE` | | 0.8 rad | turns drop to `TURN_SLOW_DUTY` when this close to the target |
+| `TURN_SLOW_DUTY` | | 0.3 | duty per wheel in the slow zone |
+| `SLIP_REGRIP_SPEED` | | 0.02 m/s | a slipping wheel grips again below this spin speed |
+| `SLIP_MERGE_TIME` | | 0.25 s | slip bursts closer than this are one event |
 | `STALL_SPEED` | | 0.02 m/s | below this, a pushing robot counts as stalled |
 | `STALL_TIME` | | 0.5 s | time below `STALL_SPEED` before a `stall` event |
 | `SAMPLE_EVERY` | | 6 steps | telemetry rate (10 Hz) |
@@ -74,9 +78,10 @@ State: `x, y, theta, v` (forward speed), `w` (yaw rate), `wL, wR` (wheel angular
    - Battery draw counts only motoring current: `draw_i = max(0, I_i * sign(V_i))`, with `draw_i = 0` when `u_i = 0`. Braking current is dissipated and never charges the battery. `I_draw = draw_L + draw_R`.
 4. **Ground contact and slip** per wheel, with ground speeds `vL = v - w*TRACK/2`, `vR = v + w*TRACK/2`, and `F_lim = mu_cell * N` where `mu_cell` is the friction of the floor cell under the robot center (`MU`, or the level's slick value):
    - If wheel is not slipping and `|F_i| <= F_lim`: it grips. `F_ground_i = F_i` and `w_i = v_i / WHEEL_R`.
-   - If `|F_i| > F_lim`: it starts slipping. Set `slip_i = true`, and record a `slip` event with `required = |F_i|`, `limit = F_lim`.
-   - While slipping: `s = sign(w_i * WHEEL_R - v_i)` (use `sign(F_i)` if that is 0); `F_ground_i = F_lim * s`; `w_i += DT * (tau_i - WHEEL_R * F_ground_i) / J_WHEEL`.
-   - Slipping ends (wheel grips again) when `|w_i * WHEEL_R - v_i| < 0.02` and `|F_i| <= F_lim`. Then `w_i = v_i / WHEEL_R`.
+   - If `|F_i| > F_lim`: it starts slipping. Set `slip_i = true`, and record a `slip` event with `required = |F_i|`, `limit = F_lim`. Slip bursts of one wheel that start less than 0.25 s after the previous one ended are merged into the same event (its `peak` rises).
+   - While slipping: `s = sign(F_i)`; `F_ground_i = F_lim * s`; `w_i_new = w_i + DT * (tau_i - WHEEL_R * F_ground_i) / J_WHEEL`. The wheel may spin ahead of the ground but not fall behind it in the drive direction: if `s * (w_i_new * WHEEL_R - v_i) < 0` then `w_i_new = v_i / WHEEL_R`.
+   - Slipping ends (wheel grips again) when `|F_i| <= F_lim` and `s * (w_i_new * WHEEL_R - v_i) < 0.02`. Then `w_i = v_i / WHEEL_R` and `F_ground_i = F_i`.
+   - Wheel inertia is ignored while gripping and used only while slipping.
 5. **Body** (semi-implicit Euler):
    - `v += DT * (F_ground_L + F_ground_R - DRAG_V * v) / MASS`
    - `w += DT * ((F_ground_R - F_ground_L) * TRACK / 2 - DRAG_W * w) / I_YAW`
@@ -100,7 +105,7 @@ The interpreter holds a stack of frames `{nodes, index, remaining}` and one acti
 
 Active command behavior (each step):
 - **Move**: `travelled += d * v * DT`, `rem = target - travelled`. While `rem > BRAKE_TAU * |v| + 0.005`: `uL = uR = d * CRUISE_DUTY`. Otherwise `uL = uR = 0` (brake). The move ends when `rem <= BRAKE_TAU * |v| + 0.005`, `|v| < 0.02` and `|w| < 0.05`. If the robot is blocked and stalled, it keeps pushing until the timeout or battery ends the run.
-- **Turn**: `turned += d * w * DT`, `rem = target - turned`. While `rem > TURN_BRAKE_TAU * |w| + 0.01`: `uL = -d * TURN_DUTY`, `uR = d * TURN_DUTY`. Otherwise brake (`u = 0`). Ends when braking and `|w| < 0.05` and `|v| < 0.02`.
+- **Turn**: `turned += d * w * DT`, `rem = target - turned`. While `rem > TURN_BRAKE_TAU * |w| + 0.01`: `uL = -d * td`, `uR = d * td`, where `td = TURN_SLOW_DUTY` if `rem < TURN_SLOW_ZONE` and `TURN_DUTY` otherwise. Otherwise brake (`u = 0`). Moves and turns latch into braking: once braking starts it continues until the command ends. Ends when braking and `|w| < 0.05` and `|v| < 0.02`.
 - **Wait**: `u = 0` until `N` seconds pass.
 
 When the stack empties, `programDone = true`. The run ends as FAIL (`program_ended`) once `programDone` and `|v| < 0.02` and no goal was reached. `forward 0` and `wait 0` end in one step.
@@ -138,11 +143,11 @@ A level is defined by an ASCII map. Cell size is 0.5 m. Characters: `#` wall, `.
 
 | id | Name | Map (rows top to bottom) | Battery | Time limit | Slick mu | Reference program |
 |---|---|---|---|---|---|---|
-| 1 | First Steps | `#######` / `#S....#` / `#####.#` / `#####G#` / `#######` | 20 C | 20 s | | `forward 200` `right 90` `forward 100` |
-| 2 | Staircase | `#########` / `#S..#####` / `###.#####` / `###...###` / `#####.###` / `#####..G#` / `#########` | 10 C | 40 s | | `repeat 2 [ forward 100 right 90 forward 100 left 90 ]` `forward 100` |
-| 3 | Slippery Corner | `###########` / `#S....#####` / `#####o#####` / `#####o...G#` / `###########` | 6 C | 45 s | 0.25 | `forward 200` `right 90` `forward 100` `left 90` `forward 200` |
+| 1 | First Steps | `#######` / `#S....#` / `#####.#` / `#####G#` / `#######` | 3 C | 12 s | | `forward 200` `right 90` `forward 100` |
+| 2 | Staircase | `#########` / `#S..#####` / `###.#####` / `###...###` / `#####.###` / `#####..G#` / `#########` | 2.5 C | 25 s | | `repeat 2 [ forward 100 right 90 forward 100 left 90 ]` `forward 100` |
+| 3 | Slippery Corner | `###########` / `#S....#####` / `#####o#####` / `#####o...G#` / `###########` | 1.5 C | 22 s | 0.25 | `forward 200` `right 90` `forward 100` `left 90` `forward 200` |
 
-Level 3 turns on slick floor, so required wheel force exceeds the friction limit (5.89 N normal, 2.45 N slick) and the wheels slip. Battery and time limits are starting values. Task 8 tunes them so each reference program passes with margin and a careless program (for example one that drives into a wall) fails with the matching event.
+Level 3 turns on slick floor, so required wheel force exceeds the friction limit (5.89 N normal, 2.45 N slick) and the wheels slip. Battery and time limits were tuned in task 8 (section 10). Each reference program passes using at most 75 percent of the time and battery, and a program that drives into a wall fails with `collision`, `stall` and `battery_flat` events.
 
 `buildLevel(def)` returns:
 ```
@@ -167,10 +172,10 @@ Level 3 turns on slick floor, so required wheel force exceeds the friction limit
 - `sim.state`: `{t, x, y, theta, v, w, wL, wR, uL, uR, charge, soc, Vt, Voc, current, draw, slipL, slipR, contact, sensor, programDone}`.
 - `sim.events`: array of `{type, t, ...}`:
   - `collision {speed}`
-  - `stall {duration, current, duty}`
+  - `stall {duration, current, duty}` (created when the stall reaches 0.5 s; `duration` and `current` keep updating while it lasts, so the current falls as the battery sags)
   - `slip {wheel:'L'|'R', required, limit, mu, peak}`
   - `battery_flat {charge_used}`
-  - `timeout {limit, distance_to_goal}`
+  - `timeout {limit, distance_to_goal}` (`distance_to_goal` is the straight-line distance in meters from the robot center to the goal-zone center; the same for `program_ended`)
   - `goal {}`
   - `program_ended {distance_to_goal}`
 - `sim.result`: `{status:'running'|'pass'|'fail', reason:null|'goal'|'timeout'|'battery_flat'|'program_ended'}`.
@@ -198,3 +203,27 @@ Level 3 turns on slick floor, so required wheel force exceeds the friction limit
 ## 9. Test plan summary
 - Unit tests: parser accept/reject cases and messages; motor equations at known points (stall current `Vt / MOTOR_R`, zero torque at no-load); battery sag; slip threshold; collision; sensor; each level's reference program passes; explain text for each cause.
 - Property tests (seeded PRNG, 200 to 1000 cases each): parser never throws on random text; battery charge never increases; simulation is deterministic; speed never exceeds `V_NL`; robot never ends inside a wall; no NaN in state; telemetry never exceeds 1200 samples.
+
+## 10. Tuning log (task 8)
+
+Changes from the original starting values, with the reason. Everything not listed here is unchanged.
+
+| Item | Old | New | Reason |
+|---|---|---|---|
+| Level 1 battery capacity | 20 C | 3 C | The reference run used 0.48 C, so 20 C could never matter. Now 16 percent used, and a wall push runs it flat in about 3 s. |
+| Level 2 battery capacity | 10 C | 2.5 C | Reference uses 1.15 C (46 percent). |
+| Level 3 battery capacity | 6 C | 1.5 C | Reference uses 0.78 C (52 percent). Keeps capacity falling with level number. |
+| Level 1 time limit | 20 s | 12 s | Reference finishes in 5.9 s (49 percent). |
+| Level 2 time limit | 40 s | 25 s | Reference finishes in 12.9 s (52 percent). |
+| Level 3 time limit | 45 s | 22 s | Reference finishes in 10.8 s (49 percent). |
+| `TURN_SLOW_ZONE` | (did not exist) | 0.8 rad | Without it, a turn could miss by up to 4 degrees because the robot moves up to 5 degrees per step at full turn speed. Slowing near the target cuts the error to about 1.5 degrees. |
+| `TURN_SLOW_DUTY` | (did not exist) | 0.3 | Same reason. Chosen from a sweep of zone 0.8 or 1.0, duty 0.25 or 0.3, and `TURN_BRAKE_TAU` 0.08 to 0.11. |
+| Slip model (section 4, step 4) | the wheel's direction of friction followed the sign of (wheel speed - ground speed) | friction follows the sign of the motor force, and the wheel cannot fall behind the ground | Bug found by a unit test: while slipping, the heavy wheel spun up more slowly than the body accelerated, so the wheel lagged the ground and friction flipped to a braking force. At mu 0.4 the robot's speed dropped from 0.065 m/s back to 0 on the second step. |
+| `distance_to_goal` | undefined | distance to goal-zone center | Needed a definite meaning for explain.js. |
+
+`TURN_BRAKE_TAU` (0.10 s), `BRAKE_TAU` (0.13 s), and every motor, battery and friction constant were checked and kept.
+
+Known physical limits of the model:
+- Cruising draws about 0.03 A in total, while both motors stalled against a wall draw about 0.84 A, so the battery drains about 25 times faster against a wall than while cruising. Cruise current is low because there is little drag and no rolling resistance.
+- `J_WHEEL` (0.0005 kg m^2) is about 20 times the inertia of a real 3 cm wheel. It is kept because a realistic value gives a wheel time constant (about 0.004 s) shorter than the 1/60 s step, which makes the explicit integration unstable. As a result, a slipping wheel spins up slowly and only runs a few cm/s ahead of the ground. Slip mainly shows up as acceleration limited by friction, not as a visibly spinning wheel.
+- Ignoring wheel inertia while gripping means the slip threshold is a little lower than a real robot's.
