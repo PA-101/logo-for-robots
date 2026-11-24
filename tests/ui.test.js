@@ -168,3 +168,66 @@ test('arena height never exceeds the room available, but keeps a usable minimum'
 test('the arena column takes the spare width', () => {
   assert.ok(/grid-template-columns: 330px minmax\(640px, 1fr\) 380px/.test(css));
 });
+
+// ---- Auto-Fix Coach UI (task 18) -------------------------------------------------
+const { lineDiff, COACH_FRAME_MS } = require('../ui.js');
+const { coach } = require('../coach.js');
+
+test('lineDiff marks only the changed lines and highlights whole words', () => {
+  const rows = lineDiff('; my try\nforward 200\nright 90\nforward 50', '; my try\nforward 200\nright 90\nforward 100');
+  assert.deepStrictEqual(rows.map((r) => r.changed), [false, false, false, true]);
+  assert.deepStrictEqual(rows[3].old, ['forward ', '50', '']);
+  assert.deepStrictEqual(rows[3].new, ['forward ', '100', '']);
+  assert.deepStrictEqual(rows[0], { line: 1, changed: false, old: ['; my try', '', ''], new: ['; my try', '', ''] });
+});
+
+test('lineDiff shows an inserted wait as an addition before the turn, keeping the comment', () => {
+  const [row] = lineDiff('left 90 ; turn', 'wait 0.5 left 90 ; turn');
+  assert.deepStrictEqual(row.old, ['', '', 'left 90 ; turn']);
+  assert.deepStrictEqual(row.new, ['', 'wait 0.5 ', 'left 90 ; turn']);
+});
+
+test('lineDiff on a change inside a long repeat line keeps the rest of the line unhighlighted', () => {
+  const [row] = lineDiff('repeat 2 [ forward 100 right 80 forward 100 left 90 ]', 'repeat 2 [ forward 100 right 85 forward 100 left 90 ]');
+  assert.deepStrictEqual(row.old, ['repeat 2 [ forward 100 right ', '80', ' forward 100 left 90 ]']);
+  assert.deepStrictEqual(row.new, ['repeat 2 [ forward 100 right ', '85', ' forward 100 left 90 ]']);
+});
+
+test('property: lineDiff parts always rebuild both texts exactly', () => {
+  forAll(250000, 300, (rng) => {
+    const words = ['forward', 'left', '90', '100', ';', 'x', '[', ']', ' ', '  ', 'wait 1'];
+    const make = () => Array.from({ length: rng.int(0, 5) }, () =>
+      Array.from({ length: rng.int(0, 6) }, () => rng.pick(words)).join(rng.pick([' ', '']))).join('\n');
+    const a = make(), b = rng.bool(0.3) ? a : make();
+    const rows = lineDiff(a, b);
+    const rebuild = (side) => rows.map((r) => r[side].join('')).join('\n');
+    const lines = (t) => t.split('\n');
+    assert.deepStrictEqual(rebuild('old').split('\n').slice(0, lines(a).length), lines(a));
+    assert.deepStrictEqual(rebuild('new').split('\n').slice(0, lines(b).length), lines(b));
+    for (const r of rows) assert.strictEqual(r.changed, r.old.join('') !== r.new.join(''));
+  });
+});
+
+test('lineDiff of each coach fix changes exactly the edited lines', () => {
+  const cases = [[1, '; my try\nforward 200\nright 90\nforward 50'], [3, 'forward 150\nright 60\nforward 100\nleft 90\nforward 200']];
+  for (const [id, text] of cases) {
+    const r = coach(getLevel(id), text);
+    assert.strictEqual(r.found, true);
+    const changed = lineDiff(text, r.program).filter((row) => row.changed).map((row) => row.line);
+    assert.deepStrictEqual(changed, [...new Set(r.edits.map((e) => e.line))].sort((x, y) => x - y));
+  }
+});
+
+test('the coach runs in short slices per frame so the page stays responsive', () => {
+  assert.ok(COACH_FRAME_MS > 0 && COACH_FRAME_MS <= 16);
+  const ui = fs.readFileSync(path.join(__dirname, '..', 'ui.js'), 'utf8');
+  assert.ok(/createSearch\(/.test(ui) && !/\.coach\.coach\(/.test(ui), 'the UI steps createSearch instead of one blocking coach() call');
+  for (const label of ['SUGGEST A FIX', 'APPLY FIX', 'Trying changes... ']) assert.ok(ui.includes(label), label);
+});
+
+test('no app text calls the coach AI, a language model or machine learning', () => {
+  for (const file of ['coach.js', 'ui.js', 'index.html', 'README.md', 'style.css']) {
+    const text = fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
+    assert.ok(!/\bA\.?I\.?\b|language model|machine learning|\bLLM\b/i.test(text), file + ' mentions AI');
+  }
+});

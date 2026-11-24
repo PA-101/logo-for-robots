@@ -52,6 +52,33 @@
     };
   }
 
+  // Line-by-line diff for the coach view. The coach never adds or removes lines, so lines
+  // pair up by number; each changed line is split into an unchanged start, the changed
+  // middle, and an unchanged end, so only the edited part is highlighted.
+  function lineDiff(oldText, newText) {
+    var a = String(oldText === undefined || oldText === null ? '' : oldText).split('\n');
+    var b = String(newText === undefined || newText === null ? '' : newText).split('\n');
+    var rows = [];
+    for (var i = 0; i < Math.max(a.length, b.length); i++) {
+      var x = i < a.length ? a[i] : '', y = i < b.length ? b[i] : '';
+      if (x === y) { rows.push({ line: i + 1, changed: false, old: [x, '', ''], new: [y, '', ''] }); continue; }
+      var p = 0;
+      while (p < x.length && p < y.length && x[p] === y[p]) p++;
+      var s = 0;
+      while (s < x.length - p && s < y.length - p && x[x.length - 1 - s] === y[y.length - 1 - s]) s++;
+      // Widen the changed part to whole words, so "50 -> 100" is not shown as "5 -> 10" plus "0".
+      var word = function (ch) { return ch !== undefined && !/\s/.test(ch); };
+      while (p > 0 && word(x[p - 1]) && (word(x[p]) || word(y[p]))) p--;
+      while (s > 0 && word(x[x.length - s]) && (word(x[x.length - s - 1]) || word(y[y.length - s - 1]))) s--;
+      rows.push({
+        line: i + 1, changed: true,
+        old: [x.slice(0, p), x.slice(p, x.length - s), x.slice(x.length - s)],
+        new: [y.slice(0, p), y.slice(p, y.length - s), y.slice(y.length - s)]
+      });
+    }
+    return rows;
+  }
+
   var ARENA_PAD = 14;        // CSS px between the canvas edge and the level drawing
   var ARENA_MIN_H = 300;
 
@@ -72,7 +99,9 @@
     framePlan: framePlan,
     fitTransform: fitTransform,
     statusLine: statusLine,
-    arenaHeight: arenaHeight
+    arenaHeight: arenaHeight,
+    lineDiff: lineDiff,
+    COACH_FRAME_MS: 12
   };
 
   if (typeof module !== 'undefined') {
@@ -100,7 +129,8 @@
   var app = {
     level: null, levelId: 1, sim: null, tel: null, speed: 1,
     running: false, acc: 0, stepIndex: 0, lastTime: 0,
-    trail: [], skids: [], slipSeen: [-1e9, -1e9], ended: false, errorLines: []
+    trail: [], skids: [], slipSeen: [-1e9, -1e9], ended: false, errorLines: [],
+    lastRunText: '', coach: null, fixLines: []
   };
 
   // ---- options from the URL hash (for demos and screenshots) -----------
@@ -130,11 +160,13 @@
   // ---- editor -----------------------------------------------------------
   function updateGutter() {
     var n = el.code.value.split('\n').length;
-    var bad = {};
+    var bad = {}, fixed = {};
     app.errorLines.forEach(function (l) { bad[l] = true; });
+    app.fixLines.forEach(function (l) { fixed[l] = true; });
     var html = '';
     for (var i = 1; i <= n; i++) {
-      html += (bad[i] ? '<span class="err">' + i + '</span>' : String(i)) + (i < n ? '\n' : '');
+      var cls = bad[i] ? 'err' : fixed[i] ? 'fix' : '';
+      html += (cls ? '<span class="' + cls + '">' + i + '</span>' : String(i)) + (i < n ? '\n' : '');
     }
     el.gutter.innerHTML = html;
     el.gutter.scrollTop = el.code.scrollTop;
@@ -204,6 +236,7 @@
     app.trail = [];
     app.skids = [];
     app.slipSeen = [-1e9, -1e9];
+    app.coach = null;                       // Reset cancels a coach search in progress
     lockEditor(false);
     setStatus('', 'READY. Press RUN.');
     renderWhy(null);
@@ -212,7 +245,7 @@
   }
 
   function run() {
-    if (app.running) return;
+    if (app.running || coachBusy()) return false;
     var parsed = L.lang.parse(el.code.value);
     if (!parsed.ok) {
       showErrors(parsed.errors);
@@ -222,6 +255,7 @@
     var count = L.lang.countCommands(parsed.program);
     showMessage(count + (count === 1 ? ' command' : ' commands') + ' ready.');
     reset();
+    app.lastRunText = el.code.value;        // the coach fixes the program that actually ran
     app.sim = L.sim.createSim(app.level, parsed.program);
     app.tel.record(app.sim.state, 0);
     app.running = true;
@@ -296,6 +330,7 @@
       app.acc = plan.acc;
       for (var i = 0; i < plan.steps && app.running; i++) stepOnce();
     }
+    if (coachBusy()) stepCoach();
     app.lastTime = now;
     updateReadout();
     draw();
@@ -687,8 +722,167 @@
       });
       box.appendChild(ol);
     }
+    if (r.verdict === 'FAIL' && app.lastRunText) addCoachButton(box);
     void box.offsetWidth; // restart the highlight animation
     box.classList.add(r.verdict === 'PASS' ? 'flash-pass' : 'flash');
+  }
+
+  // ---- Auto-Fix Coach -----------------------------------------------------
+  // The coach tries small changes to the numbers in the program and simulates each one.
+  function coachBusy() { return !!(app.coach && !app.coach.search.done); }
+
+  function addCoachButton(box) {
+    var wrap = document.createElement('div');
+    wrap.className = 'coach';
+    wrap.id = 'coach';
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn';
+    btn.textContent = 'SUGGEST A FIX';
+    btn.addEventListener('click', startCoach);
+    var note = document.createElement('p');
+    note.className = 'coach-note';
+    note.textContent = 'The coach tries small changes to your distances, turns and waits, and simulates each one.';
+    wrap.appendChild(btn);
+    wrap.appendChild(note);
+    box.appendChild(wrap);
+  }
+
+  function startCoach() {
+    if (app.running || coachBusy() || !app.lastRunText) return;
+    app.coach = { search: L.coach.createSearch(app.level, app.lastRunText), text: app.lastRunText };
+    lockEditor(true);
+    renderCoachProgress();
+    if (app.coach.search.done) finishCoach();   // parse errors and "nothing to change" end at once
+  }
+
+  // Runs as many candidates as fit in about 12 ms, so the page stays responsive.
+  function stepCoach() {
+    var search = app.coach.search;
+    var t0 = root.performance.now();
+    do { search.step(1); } while (!search.done && root.performance.now() - t0 < api.COACH_FRAME_MS);
+    if (search.done) finishCoach();
+    else renderCoachProgress();
+  }
+
+  function coachBox() { return $('coach'); }
+
+  function renderCoachProgress() {
+    var box = coachBox();
+    if (!box) return;
+    var p = app.coach.search.progress;
+    box.textContent = '';
+    var line = document.createElement('p');
+    line.className = 'coach-progress';
+    line.textContent = 'Trying changes... ' + p.tried + ' / ' + p.cap;
+    box.appendChild(line);
+  }
+
+  function finishCoach() {
+    lockEditor(false);
+    var result = app.coach.search.result();
+    app.coach.result = result;
+    renderCoachResult(result, app.coach.text);
+  }
+
+  function renderCoachResult(r, original) {
+    var box = coachBox();
+    if (!box || !r) return;
+    box.textContent = '';
+    var head = document.createElement('p');
+    head.className = 'coach-head ' + (r.found ? 'found' : 'none');
+    head.textContent = r.found ? 'SUGGESTED FIX' : 'NO FIX FOUND';
+    box.appendChild(head);
+
+    if (r.found) box.appendChild(diffView(original, r.program));
+
+    // Explanation lines, with the "Before:", "Change:", ... label set apart.
+    r.explanation.split('\n').forEach(function (text) {
+      var p = document.createElement('p');
+      p.className = 'coach-line';
+      var m = /^([A-Z][A-Za-z ]{1,12}):\s/.exec(text);
+      if (m) {
+        var lab = document.createElement('span');
+        lab.className = 'coach-label';
+        lab.textContent = m[1] + ': ';
+        p.appendChild(lab);
+        p.appendChild(document.createTextNode(text.slice(m[0].length)));
+      } else {
+        p.textContent = text;
+      }
+      box.appendChild(p);
+    });
+
+    if (r.found) {
+      var apply = document.createElement('button');
+      apply.type = 'button';
+      apply.className = 'btn primary';
+      apply.textContent = 'APPLY FIX';
+      apply.addEventListener('click', function () { applyFix(r, apply); });
+      box.appendChild(apply);
+    }
+  }
+
+  // Original and suggested program side by side. Rows stay aligned when long lines wrap;
+  // changed lines carry "-" and "+" markers as well as colour.
+  function diffView(original, fixed) {
+    var grid = document.createElement('div');
+    grid.className = 'diff';
+    grid.setAttribute('role', 'table');
+    grid.setAttribute('aria-label', 'Your program and the suggested fix');
+    function cell(cls, parts, marker) {
+      var d = document.createElement('div');
+      d.className = cls;
+      d.setAttribute('role', 'cell');
+      if (marker) {
+        var mk = document.createElement('span');
+        mk.className = 'mark';
+        mk.textContent = marker + ' ';
+        d.appendChild(mk);
+      }
+      d.appendChild(document.createTextNode(parts[0]));
+      if (parts[1]) {
+        var hi = document.createElement(marker === '-' ? 'del' : 'ins');
+        hi.textContent = parts[1];
+        d.appendChild(hi);
+      }
+      d.appendChild(document.createTextNode(parts[2]));
+      return d;
+    }
+    [['', 'YOUR PROGRAM', 'SUGGESTED']].forEach(function (h) {
+      h.forEach(function (t, i) {
+        var d = document.createElement('div');
+        d.className = 'diff-head' + (i === 0 ? ' num' : '');
+        d.setAttribute('role', 'columnheader');
+        d.textContent = t;
+        grid.appendChild(d);
+      });
+    });
+    lineDiff(original, fixed).forEach(function (row) {
+      var num = document.createElement('div');
+      num.className = 'num' + (row.changed ? ' changed' : '');
+      num.textContent = String(row.line);
+      grid.appendChild(num);
+      grid.appendChild(cell('code old' + (row.changed ? ' changed' : ''), row.old, row.changed ? '-' : ''));
+      grid.appendChild(cell('code new' + (row.changed ? ' changed' : ''), row.new, row.changed ? '+' : ''));
+    });
+    return grid;
+  }
+
+  function applyFix(r, button) {
+    el.code.value = r.program;
+    app.errorLines = [];
+    app.fixLines = r.edits.map(function (e) { return e.line; });
+    updateGutter();
+    var lines = app.fixLines.filter(function (l, i, a) { return a.indexOf(l) === i; });
+    var div = document.createElement('div');
+    div.className = 'ok';
+    div.textContent = 'Fix applied to line' + (lines.length > 1 ? 's ' : ' ') + lines.join(' and ') + '. Press RUN to try it.';
+    el.messages.textContent = '';
+    el.messages.appendChild(div);
+    button.disabled = true;
+    button.textContent = 'APPLIED';
+    el.code.focus();
   }
 
   // Keeps canvas pixel sizes matched to their containers (layout can change after load).
@@ -755,7 +949,7 @@
     });
 
     el.code.value = typeof opts.code === 'string' ? opts.code : EXAMPLE_PROGRAM;
-    el.code.addEventListener('input', function () { app.errorLines = []; updateGutter(); });
+    el.code.addEventListener('input', function () { app.errorLines = []; app.fixLines = []; updateGutter(); });
     el.code.addEventListener('scroll', function () { el.gutter.scrollTop = el.code.scrollTop; });
     el.code.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); run(); }

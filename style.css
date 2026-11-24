@@ -203,6 +203,39 @@ select {
 .boot-skip { color: var(--muted); font-size: 15px; margin-top: 18px; }
 @keyframes blink { 50% { opacity: 0; } }
 
+/* ---- Auto-Fix Coach --------------------------------------------------- */
+.gutter .fix { color: var(--bg); background: var(--fg); text-shadow: none; }
+.coach { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--dim); }
+.coach-note { margin: 6px 0 0; color: var(--muted); font-size: 15px; }
+.coach-progress { margin: 0; color: var(--warn); text-shadow: none; }
+.coach-progress::before { content: "SEARCHING "; font-weight: bold; }
+.coach-head { margin: 0 0 8px; font-size: 18px; letter-spacing: 0.06em; }
+.coach-head.found { color: var(--fg); }
+.coach-head.none { color: var(--warn); text-shadow: none; }
+.coach-line { margin: 0 0 6px; }
+.coach-label { color: var(--muted); }
+.coach .btn.primary { margin-top: 6px; }
+
+.diff {
+  display: grid;
+  grid-template-columns: 2.2em 1fr 1fr;
+  margin: 0 0 10px;
+  border: 1px solid var(--dim);
+  background: #040a05;
+}
+.diff > div { padding: 2px 6px; border-bottom: 1px solid #10301a; min-width: 0; }
+.diff .diff-head { color: var(--muted); font-size: 14px; letter-spacing: 0.06em; border-bottom-color: var(--dim); }
+.diff .num { color: var(--dim); text-align: right; padding-right: 4px; text-shadow: none; }
+.diff .num.changed { color: var(--fg); }
+.diff .code { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--muted); }
+.diff .code.old { border-right: 1px solid #10301a; }
+.diff .code.changed { color: var(--fg); }
+.diff .code.old.changed { background: rgba(255, 176, 0, 0.08); }
+.diff .code.new.changed { background: rgba(51, 255, 102, 0.08); }
+.diff .mark { color: var(--muted); text-shadow: none; }
+.diff del { color: var(--warn); text-decoration: line-through; text-shadow: none; }
+.diff ins { color: var(--bg); background: var(--fg); text-decoration: none; text-shadow: none; padding: 0 2px; }
+
 @media (prefers-reduced-motion: reduce) {
   .boot-cursor, .why.flash, .why.flash-pass { animation: none; }
 }
