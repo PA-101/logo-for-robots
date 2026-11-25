@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 // Developer helper: start a local headless Chrome (or Edge), open index.html, and drive it with
 // the DevTools protocol. Talks only to the browser it starts on 127.0.0.1. Not part of the app.
 const { spawn } = require('node:child_process');
@@ -101,7 +101,7 @@ async function launch(opts) {
   };
   await open(o.hash);
   return {
-    js, waitFor, shot, open, errors, sleep,
+    js, waitFor, shot, open, errors, sleep, send,
     close: () => {
       try { ws.close(); } catch (e) { /* closed */ }
       killAll();

@@ -1,0 +1,45 @@
+# UX report
+
+Branch `overnight`. I ran a first-time-judge walkthrough with a headless browser script at 1366x768 and 1920x1080, recorded the facts, and took screenshots. Before and after shots are in `docs/screenshots/ux/`. Each finding below lists what happened, a severity and the planned fix. The fix results are added under each finding afterwards.
+
+Severity: **High** means a judge gets lost or loses work. **Medium** means confusing, or it breaks a stated requirement. **Low** means polish.
+
+## Findings (written before fixing)
+
+| ID | Severity | What happened | Planned fix |
+|---|---|---|---|
+| UX-01 | High | First screen: the only text near RUN is the button itself. Nothing says "edit the program, then press RUN" or mentions Ctrl+Enter. (The starter program does pass on the first click: "PASS: Reached the goal in 5.9 s".) | Add a one-line instruction under RUN / RESET: "Edit the program, then press RUN (or Ctrl+Enter)." |
+| UX-02 | High | Switching level keeps the previous level's program. After a run of `forward 50` on level 1, switching to level 7 left `forward 50` in the editor. | Each level gets a starter: comment lines with its title and objective. A program typed on a level is remembered for that level (UX-13). |
+| UX-03 | High | After APPLY FIX the old FAIL status, panel and arena stay on screen, so it looks like the fix failed. There is no way back to the previous program. | Apply clears the old result (like Reset) and shows "Fix applied to line N. Press RUN to try it." with an UNDO button that restores the previous program. |
+| UX-04 | Medium | While running, the editor is read-only, but the message under it still says "3 commands ready." Nothing explains the lock. | While running, the message says "The editor is locked while the robot runs. Press RESET to stop and edit." |
+| UX-05 | Medium | Jump-to buttons have no active state. After clicking GRIP AND POWER nothing shows which chapter you are in. | Mark the button for the current level's chapter (or challenge seed) with an active style and `aria-pressed`. |
+| UX-06 | Medium | Export dialog: Tab moves from COPY to CLOSE to the code box, and then out of the dialog to the page. Esc closes it and focus returns to the opener (that part works). | Keep Tab and Shift+Tab inside the dialog while it is open. |
+| UX-07 | Medium | An empty editor then RUN shows "Nothing to run ..." with the status "PROGRAM ERROR. Fix the line shown on the left." There is no line to fix. | For "nothing to run", the status says "NOTHING TO RUN. Type a command, for example forward 50." |
+| UX-08 | Medium | Challenge seed: empty, "abc", 0 and -3 silently become seed 1, 151 becomes 150, and 2.5 becomes 3. No feedback is shown. PREV at 1 wraps to 150 and NEXT at 150 wraps to 1, with nothing saying so. | When the typed seed was not a whole number from 1 to 150, show "Seeds go from 1 to 150, so this is seed N." Keep the wrap-around, and say it in the PREV and NEXT button titles. |
+| UX-09 | Medium | "Layout A/B/C" is never explained before a run. On level 7 the objective box does not say a program must pass three layouts. | On multi-layout levels the objective box adds "This level has 3 layouts (A, B, C) with different lengths. Your program must pass all of them." |
+| UX-10 | Medium | Persistence: nothing is stored (localStorage is empty after editing and switching levels). A reload loses the work. | Remember the program per level and the last level in localStorage, always inside try/catch, so blocked storage never breaks the page. |
+| UX-11 | Low | The editor textarea has `outline: none`. Its focus shows only as a border colour change, which is weak next to the clear rings on buttons. | Add a visible focus ring on the editor box (`:focus-within` outline). |
+| UX-12 | Low | Units: the panel speaks of "C" (coulombs) while the battery gauge shows % and V. "C" is never explained. | Add a units line to the COMMANDS help: "Units: cm, degrees, seconds; battery charge in C (coulombs)." |
+| UX-13 | Low | Edge states not yet checked by the walkthrough: resizing the window mid-run, and the tab hidden mid-run. | Check with a browser script. Fix only if something breaks. |
+
+### Checked and fine (no fix planned)
+
+- Ctrl+Enter in the editor runs the program.
+- Tab order follows the page: jump-to, editor, run controls, speed, export, help, level picker, hint.
+- Buttons, summaries and the select show focus rings.
+- Reset works while running.
+- The active speed button is filled.
+- A parse error shows next to the editor and marks the gutter line in red.
+- The 2000-command limit message is clear.
+- Suggest a fix appears only after a failure.
+- Copy gives "Copied to the clipboard." (or the select-and-Ctrl+C fallback).
+- Results have `aria-live`.
+- Pass and fail always carry the words PASS and FAIL, not colour alone.
+- Inputs have labels.
+- Text contrast is already at least 7:1 (Part 4 audit).
+- The result panel has no scroll area of its own, so "scroll resets to top" does not apply.
+- No console errors in any step.
+
+## Fixes
+
+(Filled in as each fix lands.)
