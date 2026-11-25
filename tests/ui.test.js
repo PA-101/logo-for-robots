@@ -551,3 +551,23 @@ test('the page has the first-step instruction near RUN, units in the help, and t
   for (const id of ['seed-note', 'layout-note']) assert.ok(html.includes('id="' + id + '"'), id);
   assert.ok(/id="seed-prev"[^>]*title="[^"]*wraps to 150/.test(html) && /id="seed-next"[^>]*title="[^"]*wraps to 1\)/.test(html));
 });
+
+// ---- export targets and hardware notes (Part B) ------------------------------------
+test('exportView can produce MicroPython, and the default stays C++', () => {
+  const cpp = exportView('forward 50', 'Level 1');
+  assert.ok(cpp.code.startsWith('// Logo for Robots'));
+  const py = exportView('forward 50', 'Level 1', null, 'micropython');
+  assert.strictEqual(py.ok, true);
+  assert.ok(py.code.startsWith('# Logo for Robots') && /^Ready to copy: \d+ lines\.$/.test(py.status));
+  assert.ok(exportView('jump', 'x', null, 'micropython').status.startsWith('Fix the program first. Line 1: '));
+});
+
+test('the export dialog has a language selector and collapsible hardware notes', () => {
+  const dlg = html.slice(html.indexOf('<dialog'), html.indexOf('</dialog>'));
+  assert.ok(/<select id="export-target">\s*<option value="cpp">C\+\+<\/option>\s*<option value="micropython">MicroPython<\/option>/.test(dlg));
+  assert.ok(/<details class="hw-notes">\s*<summary>HARDWARE NOTES<\/summary>/.test(dlg));
+  for (const s of ['What the code assumes', 'What to calibrate', 'cm per second at power 100', 'Turn degrees per second', 'Battery sag',
+    'What a real robot adds that the simulator does not', 'Gearbox friction', 'Encoder noise', 'Dead reckoning']) {
+    assert.ok(dlg.includes(s), s);
+  }
+});

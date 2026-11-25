@@ -68,3 +68,19 @@ All 13 findings were fixed in one commit, in severity order. Each is checked by 
 
 - In the 330 px editor column, long starter comment lines run past the visible width. The editor scrolls sideways, and the same title and objective are shown in full above the arena.
 - A starter is comment-only, so pressing RUN on a fresh level 2 to 9 says "NOTHING TO RUN". That is honest, but a judge has to type something or use a JUMP TO button, which loads a runnable starter.
+
+## Part B: hardware alignment
+
+- **B1, MicroPython target:** `toMicroPython` and `exportTo(target, ...)` in `export.js`, plus a LANGUAGE selector (C++ or MicroPython) in the export dialog.
+  - The MicroPython code makes the same assumptions as the C++ export, which has not changed. It drives two motors through a motor-driver board, with one PWM pin and one direction pin per motor.
+  - The pin numbers (`LEFT_PWM_PIN` and the others) are marked constants, and the timing comes from the same simulator-derived constants.
+  - `if wall-ahead` calls a placeholder `read_distance_cm()` function.
+  - The header says the code is uncalibrated, uses dead reckoning with no encoders, and must be tuned on a real robot.
+  - Tests in `tests/export.micropython.test.js`, 9 in total:
+    - fixed expected outputs for the 5 samples, in `tests/fixtures/export-py/`;
+    - a property test showing it never throws on 400 random valid programs, with one commented line per command;
+    - no throws on odd input, and no brand names;
+    - with Python 3 installed (it is on this machine, so these ran): `py_compile` of all 5 samples, and each sample run end to end under CPython with stand-in `machine` and `time` modules. Both passed.
+- **B2, hardware notes:** a collapsible "HARDWARE NOTES" section in the export dialog. It covers what the code assumes, what to calibrate (cm per second at power 100, turn degrees per second, battery sag, the distance sensor), and what real robots add (gearbox friction and dead band, encoder noise, sensor noise, motor heating, battery resistance).
+- No brand or vendor names in the UI or the exported code; the existing brand test covers `index.html`, `ui.js` and `export.js`.
+- With the notes open the dialog is taller than the window at 1366x768, so it scrolls.

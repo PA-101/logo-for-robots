@@ -131,15 +131,43 @@
 
   <dialog id="export-dialog" class="export-dialog" aria-labelledby="export-title">
     <div class="export-head">
-      <h2 id="export-title">MICROCONTROLLER CODE (C++)</h2>
+      <h2 id="export-title">MICROCONTROLLER CODE</h2>
+      <label class="export-target">LANGUAGE
+        <select id="export-target">
+          <option value="cpp">C++</option>
+          <option value="micropython">MicroPython</option>
+        </select>
+      </label>
       <div class="export-actions">
         <button id="export-copy" type="button" class="btn primary">COPY</button>
         <button id="export-close" type="button" class="btn">CLOSE</button>
       </div>
     </div>
-    <p class="note export-note">Plain C++ for a two-wheeled robot with two PWM motor outputs. The timing constants are uncalibrated: tune them on your robot.</p>
+    <p class="note export-note">Code for a two-wheeled robot with two PWM motor channels through a motor-driver board. The timing constants are uncalibrated: tune them on your robot.</p>
+    <details class="hw-notes">
+      <summary>HARDWARE NOTES</summary>
+      <h3>What the code assumes</h3>
+      <ul>
+        <li>Two DC motors through a motor-driver board: one PWM signal (speed) and one direction signal per motor. In C++ you write <code>setMotorPwm</code>; in MicroPython you set the pin numbers at the top.</li>
+        <li>A front bumper switch, and a front distance sensor for <code>if wall-ahead</code> (a placeholder function you fill in).</li>
+        <li>Dead reckoning: every move and turn is timed. There are no wheel encoders, so errors add up over a long program.</li>
+      </ul>
+      <h3>What to calibrate</h3>
+      <ul>
+        <li><strong>cm per second at power 100:</strong> drive forward for a fixed time on your floor, measure the distance, and set <code>MS_PER_CM</code> to (time in ms) divided by (distance in cm).</li>
+        <li><strong>Turn degrees per second:</strong> spin for a fixed time, measure the angle, and set <code>MS_PER_DEG</code> the same way.</li>
+        <li><strong>Battery sag:</strong> repeat both measurements with a fuller and an emptier battery. Speed drops as the voltage sags, so calibrate at the charge you will run at, or recalibrate.</li>
+        <li><strong>Distance sensor:</strong> check that <code>WALL_AHEAD_CM</code> (35) matches what your sensor reports at that distance.</li>
+      </ul>
+      <h3>What a real robot adds that the simulator does not</h3>
+      <ul>
+        <li>Gearbox friction and a dead band: below some duty the wheels do not turn at all, and the two motors rarely match, so the robot drifts sideways.</li>
+        <li>Encoder noise and wheel slip on real floors, if you add encoders later.</li>
+        <li>Sensor noise, motor heating, and battery internal resistance that changes with temperature and age.</li>
+      </ul>
+    </details>
     <p id="export-status" class="export-status" role="status" aria-live="polite"></p>
-    <textarea id="export-code" class="export-code" readonly spellcheck="false" wrap="off" aria-label="Exported C++ code"></textarea>
+    <textarea id="export-code" class="export-code" readonly spellcheck="false" wrap="off" aria-label="Exported code"></textarea>
   </dialog>
 
   <script src="lang.js"></script>

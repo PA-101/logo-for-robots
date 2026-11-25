@@ -348,3 +348,14 @@ option { color: var(--fg); }
 .layout-explain[hidden] { display: none; }
 .units { margin: 8px 0 0; font-size: 14px; color: var(--muted); }
 .undo-btn { margin-left: 6px; }
+
+/* ---- export target and hardware notes ----------------------------------- */
+.export-target { color: var(--muted); display: flex; align-items: center; gap: 8px; }
+.hw-notes { border: 1px solid var(--dim); padding: 6px 10px; }
+.hw-notes summary { cursor: pointer; color: var(--muted); }
+.hw-notes summary:hover, .hw-notes summary:focus-visible { color: var(--fg); }
+.hw-notes h3 { margin: 10px 0 4px; font-size: 15px; font-weight: normal; color: var(--fg); letter-spacing: 0.04em; }
+.hw-notes ul { margin: 0; padding-left: 1.3em; color: var(--muted); font-size: 15px; }
+.hw-notes li { margin-bottom: 4px; }
+.hw-notes code { color: var(--fg); }
+.export-dialog[open] { overflow: auto; }

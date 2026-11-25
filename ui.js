@@ -142,9 +142,10 @@
   }
 
   // What the export dialog shows for the editor text: the code, or the first parse error.
-  function exportView(text, title, exporter) {
+  // target: 'cpp' (default) or 'micropython'.
+  function exportView(text, title, exporter, target) {
     var ex = exporter || (typeof module !== 'undefined' ? require('./export.js') : root.LFR.exporter);
-    var r = ex.toCpp(text, { title: title });
+    var r = ex.exportTo ? ex.exportTo(target || 'cpp', text, { title: title }) : ex.toCpp(text, { title: title });
     if (r.ok) return { ok: true, code: r.code, status: 'Ready to copy: ' + r.code.split('\n').length + ' lines.' };
     var e = r.errors[0] || { line: 0, message: 'The program could not be exported.' };
     return { ok: false, code: '', status: 'Fix the program first. ' + (e.line > 0 ? 'Line ' + e.line + ': ' : '') + e.message };
@@ -1430,13 +1431,19 @@
 
     // Export dialog: plain C++ for the program in the editor, with a Copy button.
     var dlg = $('export-dialog'), exCode = $('export-code'), exStatus = $('export-status'), exCopy = $('export-copy');
-    $('export').addEventListener('click', function () {
-      var v = exportView(el.code.value, headerText(app.level));
+    var exTarget = $('export-target');
+    function fillExport() {
+      var v = exportView(el.code.value, headerText(app.level), null, exTarget.value);
       exCode.value = v.code;
       exCode.hidden = !v.ok;
       exCopy.disabled = !v.ok;
       exStatus.textContent = v.status;
       exStatus.className = 'export-status' + (v.ok ? '' : ' error');
+      return v;
+    }
+    exTarget.addEventListener('change', fillExport);
+    $('export').addEventListener('click', function () {
+      var v = fillExport();
       if (typeof dlg.showModal === 'function') dlg.showModal(); else dlg.setAttribute('open', '');
       (v.ok ? exCopy : $('export-close')).focus();
     });
