@@ -115,3 +115,16 @@ Running log of the autonomous build. One entry per task: what was done, test cou
 - KIRO_LOG.md created (it did not exist). docs/kiro-writeup-notes.md lists only what happened, with commits and test counts. It separates bugs found by tests from problems found by screenshots and scripts, and says no separate review agent was run.
 - Process slip: the first commits of task 29 (`f43d71a`) and task 35 (`d9dd231`) came from commands I thought had been interrupted, and were pushed before I had seen their test results. Their code is identical to the later states that passed (276 and 298 tests), so no failing state was pushed. The second commits (`f632b32`, `f3bf635`) only duplicated a report entry; the duplicates were removed.
 - Tests: 308 pass.
+
+## Task 14: final check (done last, after Parts 4 and 5)
+
+- Walkthrough in headless Chrome over file://, the same as opening index.html by double-click. Through the UI: references for levels 1, 4 and 7 (all 3 layouts) and challenges 1, 75 and 150 pass. A fixed-distance level 7 program shows A PASS / B FAIL / C FAIL and replays B. Coach: three fixes applied and re-run to PASS, and one "NO FIX FOUND". The Part 4 audit covered stall, battery flat, slip, timeout and stopping short, the export dialog and Challenge mode with no overlaps or console errors. All 9 references pass every layout in the Node tests.
+- New `tests/nodom.test.js`: no DOM, unseeded randomness or clock reads in any logic file (comments and strings stripped first), and every logic file has the dual export line.
+- Harness bug found during this check: `scripts/cdp.js` and `e2e-coach.js` used fixed debugging ports, and on Windows `kill()` left Chrome child processes running. A later run attached to a stale browser and reported level 1's reference as failing. Fixed: Chrome picks a free port (read from DevToolsActivePort), the whole process tree is killed on close, and e2e-coach.js uses the shared helper. 4 leftover headless Chrome processes that my scripts started (temporary lfr-chrome profiles) were stopped. The rerun is clean.
+- Not done: a physical double-click in a desktop browser by a person. Every browser check here was headless.
+- Tests: 312 pass (suite about 16 s).
+
+## Blocked
+
+1. MCP registration and calls through Kiro (task 37). A Kiro permission rule ("kiro-scope") refused writes to `.kiro/settings/mcp.json`; it was not bypassed. So list_levels, run_program and suggest_fix were never called through Kiro. Exact errors and a direct stdio transcript (clearly labelled) are in docs/mcp-proof.md. To unblock: add the entry from tools/sim-mcp/README.md yourself, then call the tools in a new turn.
+2. Not fully verified: COPY to the real clipboard (task 35). Headless file:// fell back to selecting the text. It needs a check with a real click on GitHub Pages.

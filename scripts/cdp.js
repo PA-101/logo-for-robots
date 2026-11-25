@@ -18,20 +18,29 @@ let nextPort = 9333;
 async function launch(opts) {
   const o = Object.assign({ width: 1500, height: 1000, scale: 1, hash: 'skipboot' }, opts || {});
   if (!CHROME) throw new Error('No Chrome or Edge found');
-  const port = nextPort++;
+  // Port 0 lets Chrome pick a free port and write it to DevToolsActivePort in the profile, so a
+  // browser left over from an earlier run can never be attached to by mistake.
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'lfr-chrome-'));
   const chrome = spawn(CHROME, ['--headless=new', '--disable-gpu', '--hide-scrollbars=false',
-    '--window-size=' + o.width + ',' + o.height, '--remote-debugging-port=' + port,
+    '--window-size=' + o.width + ',' + o.height, '--remote-debugging-port=0',
     '--user-data-dir=' + profile, 'about:blank'], { stdio: 'ignore' });
-  let target = null;
-  for (let i = 0; i < 60 && !target; i++) {
+  // Kill the whole process tree (on Windows, killing the main process leaves its children running).
+  const killAll = () => {
+    try {
+      if (process.platform === 'win32') require('node:child_process').execFileSync('taskkill', ['/pid', String(chrome.pid), '/T', '/F'], { stdio: 'ignore' });
+      else chrome.kill('SIGKILL');
+    } catch (e) { /* already gone */ }
+  };
+  let port = null, target = null;
+  for (let i = 0; i < 75 && !target; i++) {
     await sleep(200);
     try {
+      if (!port) port = Number(fs.readFileSync(path.join(profile, 'DevToolsActivePort'), 'utf8').split('\n')[0]);
       const list = await (await fetch('http://127.0.0.1:' + port + '/json/list')).json();
       target = list.find((t) => t.type === 'page');
     } catch (e) { /* not up yet */ }
   }
-  if (!target) { chrome.kill(); throw new Error('Chrome did not start'); }
+  if (!target) { killAll(); throw new Error('Chrome did not start'); }
   const ws = new WebSocket(target.webSocketDebuggerUrl);
   await new Promise((r) => ws.addEventListener('open', r, { once: true }));
   let id = 0;
@@ -89,7 +98,7 @@ async function launch(opts) {
   await open(o.hash);
   return {
     js, waitFor, shot, open, errors, sleep,
-    close: () => { try { ws.close(); } catch (e) { /* closed */ } chrome.kill(); }
+    close: () => { try { ws.close(); } catch (e) { /* closed */ } killAll(); }
   };
 }
 

@@ -28,7 +28,7 @@ Build in this order. Each task is small, ends with a passing `node --test tests/
 
 - [x] 13. **Telemetry graph and "Why did it fail?" panel.** Graph canvas with reserved margins for axes and legend (speed green, current amber, battery dashed), cleared on Reset; panel with PASS/FAIL result and the explain text; amber and red styling with text labels. _Requirements: 4.2, 4.3, 4.4, 5.1 to 5.8_
 
-- [ ] 14. **Final check and README.** Do this last, after tasks 15 to 38. Also walk through one level per chapter and three challenge seeds (1, 75, 150). Manual walkthrough of all 3 levels by double-clicking `index.html` in a current browser (pass each with its reference program; trigger stall, battery flat, slip, timeout and see the panel; ask the coach for a fix on a failing run and apply it); check no text overlaps graphics; confirm no DOM use outside `ui.js` with a grep test; finish `README.md`. _Requirements: 7.1 to 7.3, 8.14, 8.15_
+- [x] 14. **Final check and README.** Do this last, after tasks 15 to 38. Also walk through one level per chapter and three challenge seeds (1, 75, 150). Manual walkthrough of all 3 levels by double-clicking `index.html` in a current browser (pass each with its reference program; trigger stall, battery flat, slip, timeout and see the panel; ask the coach for a fix on a failing run and apply it); check no text overlaps graphics; confirm no DOM use outside `ui.js` with a grep test; finish `README.md`. _Requirements: 7.1 to 7.3, 8.14, 8.15_
 
 ## Auto-Fix Coach (added after the first 14 tasks)
 
