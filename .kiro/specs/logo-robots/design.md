@@ -200,7 +200,7 @@ Starting values below are not tuned yet. Task 26 tunes them like task 8 and reco
 
 | id | Name | Map (rows top to bottom) | Ice mu | Battery | Time | Reference |
 |---|---|---|---|---|---|---|
-| 4 | Ice Hairpin | `############` / `#Sooooooooo#` / `##########o#` / `#Gooooooooo#` / `############` | 0.08 | 3.5 C | 44 s | `power 70` `forward 450` `right 90` `forward 100` `right 90` `forward 450` |
+| 4 | Ice Hairpin | `############` / `#Sooooooooo#` / `##########o#` / `#Gooooooooo#` / `############` | 0.08 | 4.0 C | 44 s | `power 70` `forward 450` `right 90` `forward 100` `right 90` `forward 450` |
 | 5 | Frozen Switchback | `#############` / `#Soooooooooo#` / `###########o#` / `#ooooooooooo#` / `#o###########` / `#ooooooooooG#` / `#############` | 0.08 | 4 C | 75 s | `power 70` `forward 500` `right 90` `forward 100` `right 90` `forward 500` `left 90` `forward 100` `left 90` `forward 500` |
 | 6 | Black Ice | `##################` / `#S..o#############` / then 6 rows of `####o#############` / `####ooooooooo...G#` / `##################` | 0.08 | 1.8 C | 46 s | `forward 150` `power 60` `right 90` `forward 350` `left 90` `forward 400` `power 100` `forward 200` |
 
@@ -315,6 +315,7 @@ Known physical limits of the model:
 |---|---|---|---|
 | Level 4 battery | 2.5 C | 3.5 C | At friction x0.9 the reference used 71% of 2.5 C. Charge used is not smooth in capacity (75% at 2.9 C, 51% at 3.0 C, because a fuller battery keeps a higher voltage and the robot slips more), so 3.5 C was picked from the middle of the stable range 3.0 to 4.0 C. Measured at x0.9: 51% of the battery; full power still runs flat at x0.9, x1.0 and x1.1. |
 | Level 4 time limit | 40 s | 44 s | At x0.9 the reference took 72% of 40 s; now 64%. |
+| Level 4 battery (overnight polish) | 3.5 C | 4.0 C | A 0.05 C scan from 2.6 to 4.6 C found two sudden jumps in charge use: at friction x0.9 between 2.95 and 3.00 C (75.0% to 51.2%), and at x1.0 between 3.30 and 3.35 C (42.9% to 30.9%). 3.5 C was only 0.15 C above the second jump. From 3.9 to 4.1 C the x0.9 charge use varies by at most 1.1 points within +-0.25 C, x1.0 changes smoothly (28.3 to 28.9%), and the nearest jump is 0.6 C away. At 4.0 C the reference uses 48.3% of the battery and 64.6% of the time at x0.9, 28.6% and 61.2% at x1.0, and 25.4% and 60.5% at x1.1. Full power still runs flat at all three. |
 | Level 6 map | straight 6-cell ice leg between dry corners (14 x 10) | dry start, icy corner, 7 ice cells south, icy corner, 8 ice cells east, dry finish (18 x 10) | On the old map ice friction had no effect at all: the robot accelerated and braked on dry floor and needed no grip on the ice. At ice friction 0.04, 0.05, 0.06 and 0.08 full power passed in 17.1 s (faster than the reference). A search of 54 passing shapes found this one. |
 | Level 6 battery | 3 C | 1.8 C | Full power uses about 1.7 to 1.9 C on the new map, the reference about 1.2 C. 1.8 C runs full power flat at x0.9, x1.0 and x1.1 and leaves the reference 33% spare. |
 | Level 6 time limit | 30 s | 46 s | The new map is longer. The reference takes 69% of 46 s at x0.9. |

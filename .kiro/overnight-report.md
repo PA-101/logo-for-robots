@@ -15,4 +15,11 @@ Polish run on branch `overnight`, created from `main` at `47637fa` because the b
 
 - The coach diff shows only changed lines plus one line of context on each side. Other unchanged lines fold into a "N lines unchanged" row. New pure helper `diffWindow` with unit tests and a property test: no changed line is ever dropped, line order is kept, and every line is either shown or counted in a gap. `lineDiff` and its tests are unchanged.
 - Browser check (`scripts/e2e-coach.js`): all three fixes still show their changed rows (1, 1 and 2), and each applied fix passes when re-run. On level 1 the comment and first line fold into "2 lines unchanged". No page errors.
+- Tests: 318 pass. Commit `b2879a2`.
+
+## Item 3: level 4 battery in a flatter region
+
+- A 0.05 C scan from 2.6 to 4.6 C, at friction x0.9, x1.0 and x1.1, found two sudden jumps in the reference's charge use, not one: at x0.9 between 2.95 and 3.00 C (75.0% to 51.2%), and at x1.0 between 3.30 and 3.35 C (42.9% to 30.9%). The old value, 3.5 C, was only 0.15 C above the second jump.
+- Changed level 4's battery from 3.5 to 4.0 C. Between 3.9 and 4.1 C, x0.9 charge use varies by at most 1.1 points within +-0.25 C, x1.0 is smooth (28.3 to 28.9%), and the nearest jump is 0.6 C away.
+- At 4.0 C the reference uses 48.3% of the battery and 64.6% of the time at x0.9, 28.6% and 61.2% at x1.0, and 25.4% and 60.5% at x1.1. Full power runs flat at all three. Recorded in the design.md tuning log, and the level table is updated. This is a level value, not a physics constant.
 - Tests: 318 pass.

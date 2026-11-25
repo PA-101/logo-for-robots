@@ -73,7 +73,7 @@
         '#Gooooooooo#',
         '############'
       ],
-      capacity: 3.5,
+      capacity: 4.0,
       timeLimit: 44,
       slickMu: 0.08,
       powerMatters: true,
