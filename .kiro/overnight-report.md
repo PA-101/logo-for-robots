@@ -35,4 +35,19 @@ Polish run on branch `overnight`, created from `main` at `47637fa` because the b
 
 - All 10 references in index.html (`style.css` and the 9 scripts) are plain relative file names: no scheme, no leading slash, no `..`, no backslash, no query. Each matches a real file with exactly the same case. That matters because GitHub Pages is case-sensitive and Windows is not. index.html, style.css and ui.js contain no URLs and make no network requests.
 - New `tests/paths.test.js` (3 tests) checks all of this. The page loading from a file path was exercised by this session's headless checks (items 1 and 2, over file://). Loading from https://pa-101.github.io/logo-for-robots/ can only be checked after the branch is merged; it was not checked here, as instructed.
-- Tests: 321 pass.
+- Tests: 321 pass. Commit `93c3730`.
+
+## Item 6: no headless browsers left running
+
+- At the end: 0 headless Chrome or Edge processes running. Checked by command line, for any process with `headless`.
+- Every browser check tonight ran with `LFR_TMP` pointing inside the repo, and `scripts/cdp.js` deletes each profile on close. The scratch folder `.scratch/` was deleted.
+- Found and left alone: 32 `lfr-chrome-*` profile folders in the system temp folder. All were last written by 19:01:30, before this branch's base commit (19:02:38), so they come from the earlier session's browser checks, before cdp.js deleted its profiles. They are outside the repo, so tonight's rules did not allow deleting them. They are safe to delete by hand: `%TEMP%\lfr-chrome-*`.
+
+## Blocked
+
+- Nothing blocked tonight.
+
+## Summary
+
+- Commits on `overnight`, oldest first: `ed9ca9a` (item 1), `b2879a2` (item 2), `0f22173` (item 3), `6e6392b` (item 4), `93c3730` (item 5), plus this report. `main` is unchanged at `47637fa`.
+- Final test count: 321, all passing.
