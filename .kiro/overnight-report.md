@@ -29,4 +29,10 @@ Polish run on branch `overnight`, created from `main` at `47637fa` because the b
 - Ran `node --test tests/` five times in a row with the TAP reporter and compared the results test by test. All five runs: 318 pass, 0 fail. No test failed in any run and no test changed result between runs. No change was needed.
 - Slowest tests (min to max over the 5 runs): generator determinism over 150 seeds 6.7 to 9.1 s; coach on 10 generated levels 5.7 to 6.1 s; coach timing on chapter 3 2.6 to 3.2 s; coach golden results 2.3 to 2.5 s.
 - Risk, not a failure: three tests assert spec performance budgets in wall-clock time (150 seeds generated in under 10 s, the coach on 10 generated levels under 15 s, the chapter 3 coach under 15 s). Here they have 2.4x to 4.6x headroom, but they could fail on a much slower machine. They are performance limits, not race conditions, and were left unchanged.
-- Tests: 318 pass.
+- Tests: 318 pass. Commit `6e6392b`.
+
+## Item 5: relative paths
+
+- All 10 references in index.html (`style.css` and the 9 scripts) are plain relative file names: no scheme, no leading slash, no `..`, no backslash, no query. Each matches a real file with exactly the same case. That matters because GitHub Pages is case-sensitive and Windows is not. index.html, style.css and ui.js contain no URLs and make no network requests.
+- New `tests/paths.test.js` (3 tests) checks all of this. The page loading from a file path was exercised by this session's headless checks (items 1 and 2, over file://). Loading from https://pa-101.github.io/logo-for-robots/ can only be checked after the branch is merged; it was not checked here, as instructed.
+- Tests: 321 pass.
