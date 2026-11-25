@@ -128,14 +128,14 @@
     };
     var challenge = function (seed) {
       return {
-        label: 'CHALLENGE ' + seed, key: 'c' + seed,
+        label: 'CHALLENGE ' + seed, key: 'c' + seed, match: { seed: seed },
         starter: '; Challenge ' + seed + ': one leg of this route is too short.\n; Run it, then press SUGGEST A FIX.\n' + halveLast(gn.generate(seed).reference) + '\n'
       };
     };
     return [
-      { label: 'BASICS', key: '1', starter: EXAMPLE_PROGRAM },
-      { label: 'GRIP AND POWER', key: '4', starter: '; Level 4 at full power: watch the wheels slip on the ice.\n; Then press SUGGEST A FIX.\n' + noPower(lv.getLevel(4).reference) + '\n' },
-      { label: 'BUMPERS', key: '7', starter: '; Level 7 with distances measured on layout A.\n; Check the layout chips after the run.\nforward 150\nright 90\nforward 50\n' },
+      { label: 'BASICS', key: '1', match: { chapter: 1 }, starter: EXAMPLE_PROGRAM },
+      { label: 'GRIP AND POWER', key: '4', match: { chapter: 2 }, starter: '; Level 4 at full power: watch the wheels slip on the ice.\n; Then press SUGGEST A FIX.\n' + noPower(lv.getLevel(4).reference) + '\n' },
+      { label: 'BUMPERS', key: '7', match: { chapter: 3 }, starter: '; Level 7 with distances measured on layout A.\n; Check the layout chips after the run.\nforward 150\nright 90\nforward 50\n' },
       challenge(75),
       challenge(150)
     ];
@@ -233,6 +233,77 @@
     return out;
   }
 
+  // ---- UX helpers (pure) -------------------------------------------------
+
+  // Storage key for a built level: '1' to '9', or 'c75' for a challenge seed.
+  function levelKeyString(level) {
+    if (!level) return '1';
+    return level.chapter === 'challenge' ? 'c' + level.seed : String(level.id);
+  }
+
+  // Starter text for a level: the passing example on level 1, otherwise the title and objective
+  // as comments (comments alone are "nothing to run", so this never runs a hidden solution).
+  function starterProgram(level) {
+    if (!level || (level.chapter !== 'challenge' && level.id === 1)) return EXAMPLE_PROGRAM;
+    var v = objectiveView(level);
+    return '; ' + v.title + '\n; Goal: ' + v.objective + '\n; Type your commands below, then press RUN.\n';
+  }
+
+  // A small wrapper around localStorage. Every access is inside try/catch: storage can be
+  // missing, blocked (privacy settings, file:// in some browsers) or full, and the page must
+  // keep working. getStorage is a function because even reading window.localStorage can throw.
+  var STORE_PREFIX = 'lfr.';
+  function createStore(getStorage) {
+    function s() { try { return getStorage(); } catch (e) { return null; } }
+    function get(k) { try { var st = s(); return st ? st.getItem(STORE_PREFIX + k) : null; } catch (e) { return null; } }
+    function set(k, v) { try { var st = s(); if (st) st.setItem(STORE_PREFIX + k, v); return !!st; } catch (e) { return false; } }
+    return {
+      getProgram: function (key) { return get('program.' + key); },
+      setProgram: function (key, text) { return set('program.' + key, String(text)); },
+      getLastLevel: function () { return get('lastLevel'); },
+      setLastLevel: function (key) { return set('lastLevel', String(key)); }
+    };
+  }
+
+  // What the seed field means, and a message when the typed value had to be changed.
+  function seedInput(raw) {
+    var text = String(raw === undefined || raw === null ? '' : raw).trim();
+    var n = Number(text);
+    var valid = text !== '' && /^\d+$/.test(text) && n >= 1 && n <= 150;
+    var seed = Math.round(n);
+    if (!isFinite(seed) || text === '') seed = 1;
+    seed = Math.max(1, Math.min(150, seed));
+    return { seed: seed, message: valid ? '' : 'Seeds go from 1 to 150, so this is seed ' + seed + '.' };
+  }
+
+  // Status line for a program that does not parse.
+  function parseErrorStatus(errors) {
+    var e = errors && errors[0];
+    if (e && e.line === 0 && /^Nothing to run/.test(e.message)) {
+      return { kind: 'fail', text: 'NOTHING TO RUN. Type a command, for example forward 50.' };
+    }
+    return { kind: 'fail', text: 'PROGRAM ERROR. Fix the line shown on the left.' };
+  }
+
+  // Which jump-to button matches the current level: same chapter, or the same challenge seed.
+  function jumpActiveIndex(list, level) {
+    if (!level || !Array.isArray(list)) return -1;
+    for (var i = 0; i < list.length; i++) {
+      var m = list[i].match || {};
+      if (level.chapter === 'challenge' ? m.seed === level.seed : m.chapter === level.chapter) return i;
+    }
+    return -1;
+  }
+
+  // One line that explains layouts, for levels that have several.
+  function layoutNote(level) {
+    var n = level && level.layoutCount > 1 ? level.layoutCount : 0;
+    if (!n) return '';
+    var names = [];
+    for (var i = 0; i < n; i++) names.push(String.fromCharCode(65 + i));
+    return 'This level has ' + n + ' layouts (' + names.join(', ') + ') with different lengths. Your program must pass all of them.';
+  }
+
   var ARENA_PAD = 14;        // CSS px between the canvas edge and the level drawing
   var ARENA_MIN_H = 300;
 
@@ -262,6 +333,13 @@
     objectiveView: objectiveView,
     exportView: exportView,
     shortcutList: shortcutList,
+    levelKeyString: levelKeyString,
+    starterProgram: starterProgram,
+    createStore: createStore,
+    seedInput: seedInput,
+    parseErrorStatus: parseErrorStatus,
+    jumpActiveIndex: jumpActiveIndex,
+    layoutNote: layoutNote,
     CHALLENGE_VALUE: CHALLENGE_VALUE,
     arenaHeight: arenaHeight,
     lineDiff: lineDiff,
@@ -383,8 +461,10 @@
 
   // ---- simulation control ----------------------------------------------
   // key: { kind: 'level', id } or { kind: 'challenge', seed }
-  function loadLevel(key) {
+  // options.text: put this text in the editor instead of the remembered program or the starter.
+  function loadLevel(key, options) {
     if (typeof key !== 'object' || !key) key = parseLevelKey(key);
+    if (app.levelKey && !app.running) app.store.setProgram(app.levelKey, el.code.value);
     if (key.kind === 'challenge') {
       var def = L.gen.generate(key.seed);
       // Built levels do not carry the seed; keep it for the header.
@@ -406,9 +486,31 @@
     el.levelObjective.textContent = view.objective;
     el.hintBox.open = false;
     el.hint.textContent = app.level.hint || '';
+    el.layoutNote.textContent = layoutNote(app.level);
+    el.layoutNote.hidden = !el.layoutNote.textContent;
+    el.seedNote.textContent = '';
+    app.levelKey = levelKeyString(app.level);
+    app.store.setLastLevel(app.levelKey);
+    var text = options && typeof options.text === 'string' ? options.text : app.store.getProgram(app.levelKey);
+    el.code.value = typeof text === 'string' ? text : starterProgram(app.level);
+    app.errorLines = [];
+    app.fixLines = [];
+    app.undoText = null;
+    updateGutter();
+    showMessage('');
+    markJump();
     app.arena = null;
     sizeArena();
     reset();
+  }
+
+  // Highlights the jump-to button for the current chapter or challenge seed.
+  function markJump() {
+    var i = jumpActiveIndex(app.shortcuts || [], app.level);
+    Array.prototype.forEach.call(document.querySelectorAll('#shortcuts .btn'), function (b, k) {
+      b.classList.toggle('active', k === i);
+      b.setAttribute('aria-pressed', k === i ? 'true' : 'false');
+    });
   }
 
   function reset() {
@@ -441,12 +543,13 @@
     var parsed = L.lang.parse(el.code.value);
     if (!parsed.ok) {
       showErrors(parsed.errors);
-      setStatus('fail', 'PROGRAM ERROR. Fix the line shown on the left.');
+      var pe = parseErrorStatus(parsed.errors);
+      setStatus(pe.kind, pe.text);
       return false;
     }
     var count = L.lang.countCommands(parsed.program);
-    showMessage(count + (count === 1 ? ' command' : ' commands') + ' ready.');
     reset();
+    showMessage(count + (count === 1 ? ' command' : ' commands') + ' running. The editor is locked while the robot runs; press RESET to stop and edit.');
     app.lastRunText = el.code.value;        // the coach fixes the program that actually ran
     app.lastProgram = parsed.program;
     if (app.layouts && app.layouts.length > 1) setLayoutLabels(app.level.layout);
@@ -508,6 +611,7 @@
     app.running = false;
     app.ended = true;
     lockEditor(false);
+    showMessage('');
     var layouts = app.layouts && app.layouts.length ? app.layouts : [app.level];
     // The visible layout ran in the arena; the others run instantly (about 1 ms each).
     var sims = layouts.map(function (l, i) {
@@ -1039,6 +1143,7 @@
     var target = app.layouts && app.layouts.length > 1 ? app.layouts : app.level;
     app.coach = { search: L.coach.createSearch(target, app.lastRunText), text: app.lastRunText };
     lockEditor(true);
+    showMessage('The editor is locked while the coach tries changes; press RESET to stop.');
     renderCoachProgress();
     if (app.coach.search.done) finishCoach();   // parse errors and "nothing to change" end at once
   }
@@ -1067,6 +1172,7 @@
 
   function finishCoach() {
     lockEditor(false);
+    showMessage('');
     var result = app.coach.search.result();
     app.coach.result = result;
     renderCoachResult(result, app.coach.text);
@@ -1165,19 +1271,39 @@
     return grid;
   }
 
-  function applyFix(r, button) {
+  // Puts the fix in the editor, clears the old result (it belonged to the old program), and
+  // offers UNDO to bring the previous program back.
+  function applyFix(r) {
+    app.undoText = el.code.value;
+    reset();
     el.code.value = r.program;
+    app.store.setProgram(app.levelKey, r.program);
     app.errorLines = [];
     app.fixLines = r.edits.map(function (e) { return e.line; });
     updateGutter();
     var lines = app.fixLines.filter(function (l, i, a) { return a.indexOf(l) === i; });
+    el.messages.textContent = '';
     var div = document.createElement('div');
     div.className = 'ok';
     div.textContent = 'Fix applied to line' + (lines.length > 1 ? 's ' : ' ') + lines.join(' and ') + '. Press RUN to try it.';
-    el.messages.textContent = '';
+    var undo = document.createElement('button');
+    undo.type = 'button';
+    undo.id = 'undo-fix';
+    undo.className = 'btn small undo-btn';
+    undo.textContent = 'UNDO';
+    undo.title = 'Put the previous program back';
+    undo.addEventListener('click', function () {
+      if (app.running || app.undoText === null) return;
+      el.code.value = app.undoText;
+      app.store.setProgram(app.levelKey, app.undoText);
+      app.undoText = null;
+      app.fixLines = [];
+      showMessage('Previous program restored.');
+      el.code.focus();
+    });
+    div.appendChild(document.createTextNode(' '));
+    div.appendChild(undo);
     el.messages.appendChild(div);
-    button.disabled = true;
-    button.textContent = 'APPLIED';
     el.code.focus();
   }
 
@@ -1238,7 +1364,10 @@
     el.batteryFill = $('battery-fill');
     el.batteryPct = $('battery-pct');
 
+    app.store = createStore(function () { return root.localStorage; });
     el.seed = $('seed');
+    el.seedNote = $('seed-note');
+    el.layoutNote = $('layout-note');
     el.seedRow = $('seed-row');
     el.levelTitle = $('level-title');
     el.chips = $('layout-chips');
@@ -1261,13 +1390,20 @@
     });
     app.seed = 1;
     function loadSeed(s) { loadLevel({ kind: 'challenge', seed: L.gen.clampSeed(s) }); }
-    el.seed.addEventListener('change', function () { loadSeed(el.seed.value); });
+    el.seed.addEventListener('change', function () {
+      var si = seedInput(el.seed.value);
+      loadSeed(si.seed);
+      el.seedNote.textContent = si.message;
+    });
     $('seed-prev').addEventListener('click', function () { loadSeed(app.seed <= 1 ? 150 : app.seed - 1); });
     $('seed-next').addEventListener('click', function () { loadSeed(app.seed >= 150 ? 1 : app.seed + 1); });
     app.loadSeed = loadSeed;
 
     el.code.value = typeof opts.code === 'string' ? opts.code : EXAMPLE_PROGRAM;
-    el.code.addEventListener('input', function () { app.errorLines = []; app.fixLines = []; updateGutter(); });
+    el.code.addEventListener('input', function () {
+      app.errorLines = []; app.fixLines = []; updateGutter();
+      if (app.levelKey) app.store.setProgram(app.levelKey, el.code.value);   // remember per level
+    });
     el.code.addEventListener('scroll', function () { el.gutter.scrollTop = el.code.scrollTop; });
     el.code.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); run(); }
@@ -1278,19 +1414,16 @@
 
     // Judge shortcuts: load the level the same way the picker does, plus a starter program.
     var sc = $('shortcuts');
-    shortcutList(L.levels, L.gen).forEach(function (s) {
+    app.shortcuts = shortcutList(L.levels, L.gen);
+    app.shortcuts.forEach(function (s) {
       var b = document.createElement('button');
       b.type = 'button';
       b.className = 'btn small';
       b.textContent = s.label;
       b.addEventListener('click', function () {
         if (app.running || coachBusy()) return;
-        loadLevel(parseLevelKey(s.key));
-        el.code.value = s.starter;
-        app.errorLines = [];
-        app.fixLines = [];
-        updateGutter();
-        showMessage('');
+        loadLevel(parseLevelKey(s.key), { text: s.starter });
+        if (app.levelKey) app.store.setProgram(app.levelKey, s.starter);
       });
       sc.appendChild(b);
     });
@@ -1307,6 +1440,20 @@
       if (typeof dlg.showModal === 'function') dlg.showModal(); else dlg.setAttribute('open', '');
       (v.ok ? exCopy : $('export-close')).focus();
     });
+    // Keep Tab and Shift+Tab inside the open dialog. Esc closes it (native), and focus goes
+    // back to the export button.
+    dlg.addEventListener('keydown', function (e) {
+      if (e.key !== 'Tab') return;
+      var items = Array.prototype.filter.call(dlg.querySelectorAll('button, textarea, select, summary, [tabindex]'), function (n) {
+        return !n.disabled && !n.hidden && n.getClientRects().length > 0 && n.tabIndex >= 0;
+      });
+      if (!items.length) return;
+      var first = items[0], last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      else if (items.indexOf(document.activeElement) < 0) { e.preventDefault(); first.focus(); }
+    });
+    dlg.addEventListener('close', function () { $('export').focus(); });
     $('export-close').addEventListener('click', function () {
       if (typeof dlg.close === 'function') dlg.close(); else dlg.removeAttribute('open');
     });
@@ -1344,8 +1491,10 @@
     setSpeed(opts.speed ? +opts.speed : 1);
 
     app.graph = setupCanvas(el.graph, el.graph.parentNode.clientWidth || 380, 320);
-    // #level=4, #level=challenge&seed=75 or #level=c75
-    loadLevel(parseLevelKey(opts.level || '1', opts.seed));
+    // Start level: #level=4, #level=challenge&seed=75 or #level=c75; otherwise the last level
+    // used (remembered in localStorage); otherwise level 1. #code= overrides the editor text.
+    var startLevel = opts.level || app.store.getLastLevel() || '1';
+    loadLevel(parseLevelKey(startLevel, opts.seed), typeof opts.code === 'string' ? { text: opts.code } : undefined);
 
     boot('autorun' in opts || 'skipboot' in opts);
     if ('autorun' in opts && run()) {

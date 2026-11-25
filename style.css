@@ -338,3 +338,13 @@ option { color: var(--fg); }
 .layout-tag { color: var(--warn); text-shadow: none; }
 .why .layout-note.pass { color: var(--muted); }
 .diff .diff-gap { grid-column: 1 / -1; color: var(--muted); font-size: 14px; text-align: center; text-shadow: none; font-style: italic; }
+
+/* ---- UX pass ------------------------------------------------------------ */
+.instruction { margin: 0 0 10px; color: var(--muted); font-size: 15px; }
+.editor:focus-within { outline: 2px solid var(--fg); outline-offset: 2px; }
+#shortcuts .btn.active { background: var(--fg); color: var(--bg); text-shadow: none; }
+.seed-note { color: var(--warn); text-shadow: none; font-size: 15px; }
+.layout-explain { margin: 2px 0 4px; color: var(--warn); text-shadow: none; }
+.layout-explain[hidden] { display: none; }
+.units { margin: 8px 0 0; font-size: 14px; color: var(--muted); }
+.undo-btn { margin-left: 6px; }

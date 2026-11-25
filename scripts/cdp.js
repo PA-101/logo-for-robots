@@ -66,6 +66,7 @@ async function launch(opts) {
   });
   const js = async (expr) => {
     const r = await send('Runtime.evaluate', { expression: expr, returnByValue: true, awaitPromise: true });
+    if (r.error) throw new Error('DevTools: ' + r.error.message + ' (evaluating ' + expr.slice(0, 60) + ')');
     if (r.result.exceptionDetails) throw new Error(r.result.exceptionDetails.exception ? r.result.exceptionDetails.exception.description : r.result.exceptionDetails.text);
     return r.result.result.value;
   };

@@ -36,6 +36,7 @@
         <button id="run" type="button" class="btn primary">RUN</button>
         <button id="reset" type="button" class="btn">RESET</button>
       </div>
+      <p class="instruction">Edit the program, then press RUN (or Ctrl+Enter).</p>
 
       <div class="speed" role="group" aria-label="Simulation speed">
         <span class="label">SPEED</span>
@@ -64,6 +65,8 @@
           <dt>if bumped [ back 10 ]</dt><dd>run the block if the robot touched a wall since the last check</dd>
           <dt>; my note</dt><dd>a comment, ignored</dd>
         </dl>
+        <p class="units">Units: distances in cm, turns in degrees, time in seconds. Battery charge is in C (coulombs); the gauge shows it as a percentage.</p>
+        <p class="units">Keys: Ctrl+Enter runs the program. Esc closes the export window.</p>
       </details>
     </section>
 
@@ -77,12 +80,14 @@
       <div id="seed-row" class="seed-row" hidden>
         <label class="label" for="seed">SEED</label>
         <input id="seed" type="number" min="1" max="150" step="1" value="1">
-        <button id="seed-prev" type="button" class="btn small">PREV</button>
-        <button id="seed-next" type="button" class="btn small">NEXT</button>
+        <button id="seed-prev" type="button" class="btn small" title="Previous seed (from 1 it wraps to 150)">PREV</button>
+        <button id="seed-next" type="button" class="btn small" title="Next seed (from 150 it wraps to 1)">NEXT</button>
+        <span id="seed-note" class="seed-note" role="status" aria-live="polite"></span>
       </div>
       <div class="objective-box">
         <p id="level-title" class="level-title"></p>
         <p id="level-objective" class="objective"></p>
+        <p id="layout-note" class="layout-explain" hidden></p>
         <details id="hint-box" class="hint-box">
           <summary>HINT</summary>
           <p id="level-hint" class="hint"></p>

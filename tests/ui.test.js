@@ -467,3 +467,87 @@ test('property: diffWindow never drops a changed line and keeps line order', () 
     assert.strictEqual(total, rows.length, 'every line is either shown or counted in a gap');
   });
 });
+
+// ---- UX pass helpers ---------------------------------------------------------------
+const ux = require('../ui.js');
+
+test('levelKeyString and starterProgram: level 1 keeps the passing example; others start with the objective as comments', () => {
+  assert.strictEqual(ux.levelKeyString(levelsMod.getLevel(4)), '4');
+  const ch = Object.assign(levelsMod.buildLevel(genMod.generate(75)), { seed: 75, chapter: 'challenge' });
+  assert.strictEqual(ux.levelKeyString(ch), 'c75');
+  assert.strictEqual(ux.starterProgram(levelsMod.getLevel(1)), EXAMPLE_PROGRAM);
+  for (const id of [2, 4, 7, 9]) {
+    const level = levelsMod.getLevel(id);
+    const s = ux.starterProgram(level);
+    assert.ok(s.startsWith('; Level ' + id + ': '), s);
+    assert.ok(s.includes('; Goal: ' + level.objective), s);
+    const p = parse(s);
+    assert.strictEqual(p.ok, false, 'a comment-only starter never runs a hidden solution');
+    assert.strictEqual(p.errors[0].line, 0);
+  }
+  assert.ok(ux.starterProgram(ch).startsWith('; Challenge 75 (seed 75)'));
+});
+
+test('createStore: remembers programs per level and the last level, and survives broken storage', () => {
+  const mem = {};
+  const fake = { getItem: (k) => (k in mem ? mem[k] : null), setItem: (k, v) => { mem[k] = String(v); } };
+  const st = ux.createStore(() => fake);
+  assert.strictEqual(st.getProgram('4'), null);
+  assert.strictEqual(st.setProgram('4', 'forward 10'), true);
+  assert.strictEqual(st.getProgram('4'), 'forward 10');
+  st.setLastLevel('c75');
+  assert.strictEqual(st.getLastLevel(), 'c75');
+  assert.deepStrictEqual(Object.keys(mem).sort(), ['lfr.lastLevel', 'lfr.program.4']);
+  const throwing = { getItem: () => { throw new Error('blocked'); }, setItem: () => { throw new Error('quota'); } };
+  for (const broken of [() => { throw new Error('SecurityError'); }, () => null, () => undefined, () => throwing]) {
+    const b = ux.createStore(broken);
+    assert.doesNotThrow(() => { b.setProgram('1', 'x'); b.setLastLevel('2'); });
+    assert.strictEqual(b.getProgram('1'), null);
+    assert.strictEqual(b.getLastLevel(), null);
+  }
+});
+
+test('seedInput: whole numbers 1 to 150 pass silently; anything else is clamped with a message', () => {
+  assert.deepStrictEqual(ux.seedInput('17'), { seed: 17, message: '' });
+  assert.deepStrictEqual(ux.seedInput(' 150 '), { seed: 150, message: '' });
+  const cases = [['', 1], ['abc', 1], ['0', 1], ['-3', 1], ['151', 150], ['2.5', 3], ['1e2', 100], [null, 1]];
+  for (const [raw, seed] of cases) {
+    const r = ux.seedInput(raw);
+    assert.strictEqual(r.seed, seed, String(raw));
+    assert.strictEqual(r.message, 'Seeds go from 1 to 150, so this is seed ' + seed + '.', String(raw));
+  }
+});
+
+test('parseErrorStatus: an empty program is "nothing to run", not a line error', () => {
+  assert.deepStrictEqual(ux.parseErrorStatus(parse('').errors), { kind: 'fail', text: 'NOTHING TO RUN. Type a command, for example forward 50.' });
+  assert.deepStrictEqual(ux.parseErrorStatus(parse('; only a comment').errors).text, 'NOTHING TO RUN. Type a command, for example forward 50.');
+  assert.deepStrictEqual(ux.parseErrorStatus(parse('jump 5').errors), { kind: 'fail', text: 'PROGRAM ERROR. Fix the line shown on the left.' });
+  assert.strictEqual(ux.parseErrorStatus([]).text, 'PROGRAM ERROR. Fix the line shown on the left.');
+});
+
+test('jumpActiveIndex: the button for the current chapter or challenge seed', () => {
+  const list = shortcutList(levelsMod, genMod);
+  const at = (id) => ux.jumpActiveIndex(list, levelsMod.getLevel(id));
+  assert.deepStrictEqual([1, 2, 3, 4, 5, 6, 7, 8, 9].map(at), [0, 0, 0, 1, 1, 1, 2, 2, 2]);
+  const ch = (seed) => Object.assign(levelsMod.buildLevel(genMod.generate(seed)), { seed, chapter: 'challenge' });
+  assert.strictEqual(ux.jumpActiveIndex(list, ch(75)), 3);
+  assert.strictEqual(ux.jumpActiveIndex(list, ch(150)), 4);
+  assert.strictEqual(ux.jumpActiveIndex(list, ch(20)), -1, 'other seeds have no button');
+  assert.strictEqual(ux.jumpActiveIndex(list, null), -1);
+});
+
+test('layoutNote explains layouts only on multi-layout levels', () => {
+  assert.strictEqual(ux.layoutNote(levelsMod.getLevel(7)), 'This level has 3 layouts (A, B, C) with different lengths. Your program must pass all of them.');
+  assert.strictEqual(ux.layoutNote(levelsMod.getLevel(4)), '');
+  assert.strictEqual(ux.layoutNote(null), '');
+});
+
+test('the page has the first-step instruction near RUN, units in the help, and the new UX elements', () => {
+  const controls = html.indexOf('id="reset"');
+  const instr = html.indexOf('class="instruction"');
+  assert.ok(instr > controls && instr - controls < 200, 'instruction just after the run controls');
+  assert.ok(html.includes('Edit the program, then press RUN (or Ctrl+Enter).'));
+  assert.ok(/Units: distances in cm, turns in degrees, time in seconds\. Battery charge is in C \(coulombs\)/.test(html));
+  for (const id of ['seed-note', 'layout-note']) assert.ok(html.includes('id="' + id + '"'), id);
+  assert.ok(/id="seed-prev"[^>]*title="[^"]*wraps to 150/.test(html) && /id="seed-next"[^>]*title="[^"]*wraps to 1\)/.test(html));
+});

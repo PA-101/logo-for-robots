@@ -42,4 +42,29 @@ Severity: **High** means a judge gets lost or loses work. **Medium** means confu
 
 ## Fixes
 
-(Filled in as each fix lands.)
+All 13 findings were fixed in one commit, in severity order. Each is checked by unit tests for the pure helpers in `tests/ui.test.js` and by `scripts/e2e-ux.js` for the flows. That script ran 25 checks at both 1366x768 and 1920x1080, and all 25 passed at both sizes. `scripts/e2e-levels.js`, `scripts/e2e-coach.js` and `scripts/audit.js --quick` (0 issues in 28 states) still pass. Screenshots are in `docs/screenshots/ux/before/` and `docs/screenshots/ux/after/`.
+
+| ID | Fix | Checked by |
+|---|---|---|
+| UX-01 | "Edit the program, then press RUN (or Ctrl+Enter)." under RUN / RESET | page test, e2e "instruction near RUN" |
+| UX-02 | Level switch saves the old program, then loads the remembered program or a starter (title and goal as comments). Comment-only starters never run a hidden solution. Level 1 keeps the passing example. | `starterProgram` tests, e2e "switch" checks |
+| UX-03 | APPLY FIX resets the old result, puts the fix in the editor and shows "Fix applied to line N. Press RUN to try it." with UNDO, which restores the previous program | e2e "apply" and "undo" |
+| UX-04 | While running: "N commands running. The editor is locked while the robot runs; press RESET to stop and edit." While the coach searches, a matching message. Both clear when it ends. | e2e "lock is explained", "lock message cleared" |
+| UX-05 | The jump-to button for the current chapter or seed is filled and has `aria-pressed="true"` | `jumpActiveIndex` tests, e2e "jump-to" |
+| UX-06 | Tab and Shift+Tab wrap inside the export dialog. Esc closes it and focus returns to EXPORT. | e2e "dialog" checks |
+| UX-07 | An empty or comment-only program gives "NOTHING TO RUN. Type a command, for example forward 50." | `parseErrorStatus` tests, e2e "empty program" |
+| UX-08 | Invalid seeds show "Seeds go from 1 to 150, so this is seed N." The PREV and NEXT titles say they wrap around. | `seedInput` tests, e2e "seed" checks |
+| UX-09 | Multi-layout levels say "This level has 3 layouts (A, B, C) with different lengths. Your program must pass all of them." before the run | `layoutNote` tests, e2e "layouts explained" |
+| UX-10 | Programs per level and the last level are saved in localStorage through `createStore`. Every access is in try/catch. | `createStore` tests (missing, throwing and full storage), e2e "reload" and "blocked storage" |
+| UX-11 | The editor box shows a 2 px focus ring | screenshots |
+| UX-12 | The COMMANDS help has a units line (cm, degrees, seconds, C = coulombs) and a keys line (Ctrl+Enter, Esc) | page test |
+| UX-13 | Resizing mid-run: the run finishes with the normal result and the canvas follows the new width (no fix needed). Hiding the page mid-run: the run pauses with no errors and the clock does not jump (no fix needed). | e2e "resize mid-run", "hidden mid-run" |
+
+### Not fully verified
+
+- UX-13, resuming a hidden tab: in headless Chrome the page stays `hidden` after it is frozen and resumed, so the script could not check that a run continues once the tab is visible again. This rests on `requestAnimationFrame` resuming and on the 0.25 s per-frame cap in `framePlan`, which a unit test covers.
+
+### Still looks off
+
+- In the 330 px editor column, long starter comment lines run past the visible width. The editor scrolls sideways, and the same title and objective are shown in full above the arena.
+- A starter is comment-only, so pressing RUN on a fresh level 2 to 9 says "NOTHING TO RUN". That is honest, but a judge has to type something or use a JUMP TO button, which loads a runnable starter.
