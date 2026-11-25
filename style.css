@@ -337,3 +337,4 @@ option { color: var(--fg); }
 /* ---- layout shown in the graph and battery (multi-layout levels) --------- */
 .layout-tag { color: var(--warn); text-shadow: none; }
 .why .layout-note.pass { color: var(--muted); }
+.diff .diff-gap { grid-column: 1 / -1; color: var(--muted); font-size: 14px; text-align: center; text-shadow: none; font-style: italic; }

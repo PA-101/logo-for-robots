@@ -434,3 +434,36 @@ test('the TELEMETRY and BATTERY headings have a layout tag', () => {
   assert.ok(html.includes('<h2>TELEMETRY<span id="telemetry-layout" class="layout-tag"></span></h2>'));
   assert.ok(html.includes('BATTERY<span id="battery-layout" class="layout-tag"></span>'));
 });
+
+// ---- compact coach diff (overnight item 2) ---------------------------------------
+const { diffWindow } = require('../ui.js');
+
+test('diffWindow keeps changed lines plus one line of context and folds the rest', () => {
+  const before = ['; my long comment about the route', '; another comment', 'forward 200', 'right 90', 'forward 50', '; end note', 'wait 1'].join('\n');
+  const after = before.replace('forward 50', 'forward 100');
+  const rows = diffWindow(lineDiff(before, after), 1);
+  assert.deepStrictEqual(rows.map((r) => r.gap ? 'gap ' + r.count : r.line + (r.changed ? '*' : '')), ['gap 3', '4', '5*', '6', 'gap 1']);
+});
+
+test('diffWindow: two nearby changes share context; no changes shows one gap; context 0 shows only changes', () => {
+  const rows = lineDiff('a\nb\nc\nd\ne\nf', 'a\nB\nc\nD\ne\nf');
+  assert.deepStrictEqual(diffWindow(rows, 1).map((r) => r.gap ? 'gap ' + r.count : r.line), [1, 2, 3, 4, 5, 'gap 1']);
+  assert.deepStrictEqual(diffWindow(rows, 0).map((r) => r.gap ? 'gap ' + r.count : r.line), ['gap 1', 2, 'gap 1', 4, 'gap 2']);
+  assert.deepStrictEqual(diffWindow(lineDiff('x\ny', 'x\ny'), 1), [{ gap: true, count: 2 }]);
+  assert.deepStrictEqual(diffWindow([], 1), []);
+});
+
+test('property: diffWindow never drops a changed line and keeps line order', () => {
+  forAll(260000, 300, (rng) => {
+    const n = rng.int(1, 30);
+    const a = Array.from({ length: n }, (_, i) => 'line ' + i);
+    const b = a.map((l) => (rng.bool(0.15) ? l + ' changed' : l));
+    const rows = lineDiff(a.join('\n'), b.join('\n'));
+    const win = diffWindow(rows, 1);
+    const shown = win.filter((r) => !r.gap);
+    assert.deepStrictEqual(shown.filter((r) => r.changed).map((r) => r.line), rows.filter((r) => r.changed).map((r) => r.line));
+    for (let i = 1; i < shown.length; i++) assert.ok(shown[i].line > shown[i - 1].line);
+    const total = win.reduce((s, r) => s + (r.gap ? r.count : 1), 0);
+    assert.strictEqual(total, rows.length, 'every line is either shown or counted in a gap');
+  });
+});

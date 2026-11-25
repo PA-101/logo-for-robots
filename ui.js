@@ -212,6 +212,27 @@
     return 'Level ' + level.id + ': ' + level.name;
   }
 
+  // The rows the coach diff shows: changed lines plus `context` unchanged lines on each side.
+  // Runs of other unchanged lines become one { gap: true, count } row.
+  function diffWindow(rows, context) {
+    var list = Array.isArray(rows) ? rows : [];
+    var c = typeof context === 'number' && context >= 0 ? Math.floor(context) : 1;
+    var keep = list.map(function () { return false; });
+    list.forEach(function (r, i) {
+      if (!r.changed) return;
+      for (var k = Math.max(0, i - c); k <= Math.min(list.length - 1, i + c); k++) keep[k] = true;
+    });
+    var out = [], gap = 0;
+    list.forEach(function (r, i) {
+      if (keep[i]) {
+        if (gap) { out.push({ gap: true, count: gap }); gap = 0; }
+        out.push(r);
+      } else gap++;
+    });
+    if (gap) out.push({ gap: true, count: gap });
+    return out;
+  }
+
   var ARENA_PAD = 14;        // CSS px between the canvas edge and the level drawing
   var ARENA_MIN_H = 300;
 
@@ -244,6 +265,7 @@
     CHALLENGE_VALUE: CHALLENGE_VALUE,
     arenaHeight: arenaHeight,
     lineDiff: lineDiff,
+    diffWindow: diffWindow,
     COACH_FRAME_MS: 12
   };
 
@@ -1123,7 +1145,16 @@
         grid.appendChild(d);
       });
     });
-    lineDiff(original, fixed).forEach(function (row) {
+    // Only the changed lines and one line of context; the rest folds into "N lines unchanged".
+    diffWindow(lineDiff(original, fixed), 1).forEach(function (row) {
+      if (row.gap) {
+        var g = document.createElement('div');
+        g.className = 'diff-gap';
+        g.setAttribute('role', 'cell');
+        g.textContent = row.count + (row.count === 1 ? ' line' : ' lines') + ' unchanged';
+        grid.appendChild(g);
+        return;
+      }
       var num = document.createElement('div');
       num.className = 'num' + (row.changed ? ' changed' : '');
       num.textContent = String(row.line);
