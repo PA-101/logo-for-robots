@@ -333,3 +333,7 @@ option { color: var(--fg); }
 .shortcut-row { margin: 0 0 12px; }
 .shortcuts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .shortcuts .btn { font-size: 14px; letter-spacing: 0.03em; }
+
+/* ---- layout shown in the graph and battery (multi-layout levels) --------- */
+.layout-tag { color: var(--warn); text-shadow: none; }
+.why .layout-note.pass { color: var(--muted); }

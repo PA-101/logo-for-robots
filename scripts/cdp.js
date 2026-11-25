@@ -20,7 +20,11 @@ async function launch(opts) {
   if (!CHROME) throw new Error('No Chrome or Edge found');
   // Port 0 lets Chrome pick a free port and write it to DevToolsActivePort in the profile, so a
   // browser left over from an earlier run can never be attached to by mistake.
-  const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'lfr-chrome-'));
+  // Browser profiles go to LFR_TMP when it is set (for example a folder inside the repo),
+  // otherwise to the system temp folder. close() deletes the profile again.
+  const tmpBase = process.env.LFR_TMP || os.tmpdir();
+  fs.mkdirSync(tmpBase, { recursive: true });
+  const profile = fs.mkdtempSync(path.join(tmpBase, 'lfr-chrome-'));
   const chrome = spawn(CHROME, ['--headless=new', '--disable-gpu', '--hide-scrollbars=false',
     '--window-size=' + o.width + ',' + o.height, '--remote-debugging-port=0',
     '--user-data-dir=' + profile, 'about:blank'], { stdio: 'ignore' });
@@ -98,7 +102,14 @@ async function launch(opts) {
   await open(o.hash);
   return {
     js, waitFor, shot, open, errors, sleep,
-    close: () => { try { ws.close(); } catch (e) { /* closed */ } killAll(); }
+    close: () => {
+      try { ws.close(); } catch (e) { /* closed */ }
+      killAll();
+      // Remove the browser profile; Chrome may hold files for a moment, so retry briefly.
+      for (let i = 0; i < 10; i++) {
+        try { fs.rmSync(profile, { recursive: true, force: true }); break; } catch (e) { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 200); }
+      }
+    }
   };
 }
 

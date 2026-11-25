@@ -403,3 +403,34 @@ test('shortcut starters show each lesson: basics passes, the others fail in the 
 test('the page has the shortcut row above the editor', () => {
   assert.ok(html.indexOf('id="shortcuts"') > 0 && html.indexOf('id="shortcuts"') < html.indexOf('id="code"'));
 });
+
+// ---- one layout everywhere (overnight item 1) ------------------------------------
+const { layoutToShow } = require('../ui.js');
+
+test('layoutToShow: the first failing layout, or the slowest when all pass', () => {
+  const run = (status, t) => ({ result: { status }, state: { t } });
+  assert.strictEqual(layoutToShow(['A', 'B', 'C'], [run('pass', 4), run('fail', 9), run('fail', 3)], 0), 1);
+  assert.strictEqual(layoutToShow(['A', 'B', 'C'], [run('pass', 4.8), run('pass', 6.5), run('pass', 8.1)], 0), 2, 'slowest');
+  assert.strictEqual(layoutToShow(['A', 'B'], [run('pass', 5), run('pass', 5)], 1), 1, 'a tie keeps the shown layout');
+  assert.strictEqual(layoutToShow(['A'], [run('fail', 1)], 0), 0);
+  assert.strictEqual(layoutToShow([], [], 0), 0);
+});
+
+test('on real chapter 3 runs the shown layout is the one the panel explains', () => {
+  const layouts = levelsMod.getLayouts(7);
+  const names = layouts.map((l) => l.layout);
+  const fixed = layouts.map((l) => runToEnd(l, parse('forward 150\nright 90\nforward 50').program));
+  const show = layoutToShow(names, fixed, 0);
+  assert.strictEqual(show, 1);
+  assert.strictEqual(combineLayouts(names, fixed.map((s) => s.result), show).focus, show, 'panel focus = shown layout');
+  const ref = layouts.map((l) => runToEnd(l, parse(l.reference).program));
+  const slow = layoutToShow(names, ref, 0);
+  assert.strictEqual(ref[slow].state.t, Math.max(...ref.map((s) => s.state.t)));
+  assert.strictEqual(names[slow], 'C', 'the longest corridor is the slowest');
+  assert.strictEqual(combineLayouts(names, ref.map((s) => s.result), slow).focus, slow);
+});
+
+test('the TELEMETRY and BATTERY headings have a layout tag', () => {
+  assert.ok(html.includes('<h2>TELEMETRY<span id="telemetry-layout" class="layout-tag"></span></h2>'));
+  assert.ok(html.includes('BATTERY<span id="battery-layout" class="layout-tag"></span>'));
+});

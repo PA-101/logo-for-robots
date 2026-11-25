@@ -150,6 +150,19 @@
     return { ok: false, code: '', status: 'Fix the program first. ' + (e.line > 0 ? 'Line ' + e.line + ': ' : '') + e.message };
   }
 
+  // Which layout the arena, graph, battery and panel should all show after a run: the first
+  // failing layout, or the slowest one when every layout passes. runs: [{ result, state }].
+  function layoutToShow(names, runs, visible) {
+    var list = Array.isArray(runs) ? runs : [];
+    if (!list.length) return 0;
+    for (var i = 0; i < list.length; i++) if (!(list[i] && list[i].result && list[i].result.status === 'pass')) return i;
+    var slowest = typeof visible === 'number' && list[visible] ? visible : 0;
+    for (var j = 0; j < list.length; j++) {
+      if (list[j].state.t > list[slowest].state.t) slowest = j;
+    }
+    return slowest;
+  }
+
   // ---- level picker helpers (pure) -------------------------------------
   var CHALLENGE_VALUE = 'challenge';
 
@@ -222,6 +235,7 @@
     resultView: resultView,
     levelOptions: levelOptions,
     combineLayouts: combineLayouts,
+    layoutToShow: layoutToShow,
     parseLevelKey: parseLevelKey,
     headerText: headerText,
     objectiveView: objectiveView,
@@ -387,6 +401,7 @@
     app.slipSeen = [-1e9, -1e9];
     app.coach = null;                       // Reset cancels a coach search in progress
     if (el.chips) renderChips(null);
+    setLayoutLabels('');
     lockEditor(false);
     setStatus('', 'READY. Press RUN.');
     renderWhy(null);
@@ -412,6 +427,7 @@
     reset();
     app.lastRunText = el.code.value;        // the coach fixes the program that actually ran
     app.lastProgram = parsed.program;
+    if (app.layouts && app.layouts.length > 1) setLayoutLabels(app.level.layout);
     app.sim = L.sim.createSim(app.level, parsed.program);
     app.tel.record(app.sim.state, 0);
     app.running = true;
@@ -422,29 +438,48 @@
   }
 
   // Advances the simulation by one fixed step and records what the UI needs.
-  function stepOnce() {
-    var sim = app.sim;
+  // Advances a sim by one step and records what the arena and graph draw into rec
+  // ({ sim, tel, stepIndex, trail, skids, slipSeen }). Used for the live run and for replays.
+  function recordStep(rec) {
+    var sim = rec.sim;
     sim.step();
-    app.stepIndex++;
-    app.tel.record(sim.state, app.stepIndex);
+    rec.stepIndex++;
+    rec.tel.record(sim.state, rec.stepIndex);
     var st = sim.state;
-    if (app.stepIndex % 3 === 0) {
-      app.trail.push({ x: st.x, y: st.y });
-      if (app.trail.length > 900) app.trail.shift();
+    if (rec.stepIndex % 3 === 0) {
+      rec.trail.push({ x: st.x, y: st.y });
+      if (rec.trail.length > 900) rec.trail.shift();
     }
     var slips = [st.slipL, st.slipR];
     for (var i = 0; i < 2; i++) {
       if (!slips[i]) continue;
-      app.slipSeen[i] = st.t;
+      rec.slipSeen[i] = st.t;
       var side = i === 0 ? 1 : -1;
-      app.skids.push({
+      rec.skids.push({
         x: st.x - Math.sin(st.theta) * side * C.TRACK / 2,
         y: st.y + Math.cos(st.theta) * side * C.TRACK / 2,
         theta: st.theta, t: st.t
       });
-      if (app.skids.length > 600) app.skids.shift();
+      if (rec.skids.length > 600) rec.skids.shift();
     }
-    if (sim.result.status !== 'running') finishRun();
+  }
+
+  function stepOnce() {
+    recordStep(app);
+    if (app.sim.result.status !== 'running') finishRun();
+  }
+
+  // Simulates a layout to the end while recording telemetry and the trail, so it can be shown
+  // in the arena and graph. The simulation is deterministic, so this equals a live run.
+  function simulateRecorded(level, program) {
+    var rec = {
+      sim: L.sim.createSim(level, program), tel: L.telemetry.createTelemetry(),
+      stepIndex: 0, trail: [], skids: [], slipSeen: [-1e9, -1e9]
+    };
+    rec.tel.record(rec.sim.state, 0);
+    var limit = Math.ceil(((level && level.timeLimit) || 60) / C.DT) + 240;
+    for (var i = 0; i < limit && rec.sim.result.status === 'running'; i++) recordStep(rec);
+    return rec;
   }
 
   function finishRun() {
@@ -456,17 +491,39 @@
     var sims = layouts.map(function (l, i) {
       return i === app.visibleLayout ? app.sim : L.sim.runToEnd(l, app.lastProgram);
     });
-    var combined = combineLayouts(layouts.map(function (l) { return l.layout; }), sims.map(function (s) { return s.result; }), app.visibleLayout);
+    var names = layouts.map(function (l) { return l.layout; });
+    var results = sims.map(function (s) { return s.result; });
+    // The layout the panel talks about: the first failing one, or the slowest when all pass.
+    var show = layoutToShow(names, sims, app.visibleLayout);
+    if (show !== app.visibleLayout) {
+      // Show that layout in the arena, graph and battery too, so all of them agree.
+      var rec = simulateRecorded(layouts[show], app.lastProgram);
+      app.sim = rec.sim; app.tel = rec.tel; app.stepIndex = rec.stepIndex;
+      app.trail = rec.trail; app.skids = rec.skids; app.slipSeen = rec.slipSeen;
+      app.level = layouts[show];
+      app.visibleLayout = show;
+      sims[show] = rec.sim;
+    }
+    var combined = combineLayouts(names, results, show);
     var sim = sims[combined.focus], level = layouts[combined.focus];
+    var layoutName = combined.chips[combined.focus].name;
     // One explanation feeds both the status line and the panel.
     var exp = L.explain.explain({ result: sim.result, events: sim.events, state: sim.state, level: level });
     var line = statusLine(exp, L.explain.fmt);
-    if (combined.multi && !combined.pass) line.text = line.text.replace(/^FAIL: /, 'FAIL: layout ' + combined.chips[combined.focus].name + ': ');
-    if (combined.multi && combined.pass) line.text = line.text.replace(/^PASS: /, 'PASS on all ' + combined.chips.length + ' layouts: ');
+    if (combined.multi && !combined.pass) line.text = line.text.replace(/^FAIL: /, 'FAIL: layout ' + layoutName + ': ');
+    if (combined.multi && combined.pass) line.text = line.text.replace(/^PASS: /, 'PASS on all ' + combined.chips.length + ' layouts. Slowest, layout ' + layoutName + ': ');
     setStatus(line.kind, line.text);
     renderChips(combined);
+    setLayoutLabels(combined.multi ? layoutName : '');
     app.combined = combined;
-    renderWhy(sim, exp, combined.multi && !combined.pass ? 'Layout ' + combined.chips[combined.focus].name + ':' : '');
+    renderWhy(sim, exp, combined.multi ? (combined.pass ? 'Slowest layout: ' + layoutName + '.' : 'Layout ' + layoutName + ':') : '');
+  }
+
+  // "TELEMETRY (layout B)" and "BATTERY (layout B)" on multi-layout levels, empty otherwise.
+  function setLayoutLabels(name) {
+    var text = name ? ' (layout ' + name + ')' : '';
+    if (el.telemetryLayout) el.telemetryLayout.textContent = text;
+    if (el.batteryLayout) el.batteryLayout.textContent = text;
   }
 
   function renderChips(combined) {
@@ -899,6 +956,12 @@
       line.className = 'verdict pass';
       line.textContent = view.line;
       box.appendChild(line);
+      if (layoutNote) {
+        var passNote = document.createElement('p');
+        passNote.className = 'layout-note pass';
+        passNote.textContent = layoutNote;
+        box.appendChild(passNote);
+      }
     } else if (view.causes.length) {
       if (layoutNote) {
         var note = document.createElement('p');
@@ -1148,6 +1211,8 @@
     el.seedRow = $('seed-row');
     el.levelTitle = $('level-title');
     el.chips = $('layout-chips');
+    el.telemetryLayout = $('telemetry-layout');
+    el.batteryLayout = $('battery-layout');
     el.levelObjective = $('level-objective');
     el.hintBox = $('hint-box');
 
