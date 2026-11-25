@@ -84,3 +84,12 @@ All 13 findings were fixed in one commit, in severity order. Each is checked by 
 - **B2, hardware notes:** a collapsible "HARDWARE NOTES" section in the export dialog. It covers what the code assumes, what to calibrate (cm per second at power 100, turn degrees per second, battery sag, the distance sensor), and what real robots add (gearbox friction and dead band, encoder noise, sensor noise, motor heating, battery resistance).
 - No brand or vendor names in the UI or the exported code; the existing brand test covers `index.html`, `ui.js` and `export.js`.
 - With the notes open the dialog is taller than the window at 1366x768, so it scrolls.
+
+## Part C: docs
+
+- README: export targets (C++ and MicroPython, the language selector, hardware notes), APPLY FIX with UNDO, a keyboard table, per-level memory, and the honest limits of both exports (not run on a real robot).
+- docs/kiro-writeup-notes.md: both overnight runs, what each found, and which findings came from tests versus scripts or screenshots (no app bugs were found by tests in either run). Hook-triggered count: 0 observed in any session.
+
+## Blocked
+
+- Nothing blocked. One check is only partly verified: resuming a hidden tab (UX-13), because headless Chrome keeps the page hidden after freeze and resume.
