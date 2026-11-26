@@ -466,3 +466,44 @@ Mapping: `forward N` gives `setMotorPwm(p, p); delayMs(N * MS_PER_CM / power); s
 **`tools/sim-mcp/`.** `server.js` reads newline-delimited JSON-RPC 2.0 on stdin and writes responses on stdout. It handles `initialize`, `tools/list` and `tools/call` for the three tools, and returns errors as tool results. It requires the app's logic files from `../../`. It is not loaded by `index.html` and has no dependencies. The README shows an `mcp.json` entry (`command: "node"`, `args: ["tools/sim-mcp/server.js"]`).
 
 **Second hook.** `.kiro/hooks/run-level-tests-on-save.json`, in the same `v1` format as `run-tests-on-save.json`.
+
+## 16. UX redesign (R15)
+
+**Zones.** `main` becomes three columns: left 320 px (editor zone), center flexible (arena zone), right 400 px (tabs). Below 1440 px the right zone stays a column (it no longer drops below), and the arena is sized from the available height, so the arena, status line and current tab fit in 768 px. The right panel scrolls inside itself (`max-height: calc(100vh - header)`, `overflow: auto`).
+
+**Status line** (pure helper `statusStrip(state, events, result)`): `t 4.2 s  |  SLIPPING  |  slips so far: 3`. The state word is chosen in this order:
+- Ended: GOAL (pass), OUT OF BATTERY (`battery_flat`), TIMEOUT (`timeout`), STALLED (a `stall` event), otherwise STOPPED.
+- Running: STALLED if `stallTime >= STALL_TIME`, SLIPPING if a wheel is slipping, otherwise RUNNING.
+- Before a run: READY.
+
+The slip count is the number of `slip` events so far. The detail readout (speed, current, battery, sensor, power) moves into the TELEMETRY tab.
+
+**Level text** (`gen.js`):
+- Patches are counted from the map: contiguous runs of `o` cells in path order.
+- Length is the sum of the reference's `forward` distances.
+- The objective says "Follow a winding path of 14.0 m to the goal." when the path has turns, and "Drive down a straight 4.0 m corridor to the goal." when it has none.
+- Ice levels say "icy patch"; slick levels say "slick patch".
+
+**Legend:** the floor entry reads "ice" when `slickMu < 0.2` and there are slick cells, "slick floor" otherwise, and is hidden when the level has no slick cells.
+
+**Starters** (pure helper `buggyStarter(level)`):
+- Find the last command with a number in the reference: `forward`, `back`, `left`, `right` or `wait`.
+- Reduce it: distances and waits are halved (at least 1), turns lose 45 degrees (at least 1).
+- If the result still passes, try a quarter, then 1. Tests require a failure for every level and every seed checked.
+- Comments: `; starter: has a small bug`, `; <title>`, `; Goal: <objective>`.
+
+**Tabs.** Two buttons with `role="tab"` and `aria-selected`, and panels with `role="tabpanel"`. A pure helper `tabForState(state)` returns `'telemetry'` for running or pass, `'diagnosis'` for fail, and keeps the current tab before a run. The arrow keys move between tabs.
+
+**Guide line:** a pure helper `guideText(state)` with the four texts in R15.9.
+
+**Commands popover:** a `<button aria-expanded>` that opens a small box anchored under it. Esc or a click outside closes it, and focus returns to the button.
+
+**Export button:** enabled when `parse(editor).ok`, re-checked on every input. Running does not disable it.
+
+**Diagnosis markers:**
+- The trail stores `{x, y, t}`.
+- A pure helper `positionAt(trail, t)` returns the trail point nearest in time, with linear interpolation between neighbours, clamped to the ends, and `null` for an empty trail.
+- Clicking a cause sets `app.marker = {x, y, t, label}`. The arena draws a ring and a time label placed outside the corridor.
+- The slip bar is a DOM bar, with widths proportional to required and limit forces.
+
+**Ghost path:** when the coach finds a fix, the UI re-simulates the fixed program on the shown layout with the existing recorder, and keeps only its trail as `app.ghost`. The arena draws it dashed in a muted colour, under the real trail. The legend shows "suggested path" while a ghost exists. Apply, Undo, Reset or a level change clears it.

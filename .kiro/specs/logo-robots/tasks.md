@@ -132,3 +132,18 @@ Rule for every task below: all existing tests stay green, and `tests/compat.test
   Challenge levels use ids `challenge:N`. `tools/sim-mcp/README.md` explains how to register it in Kiro's `.kiro/settings/mcp.json` (example entry, not added automatically). Nothing in `index.html` loads it. Tests: drive the server through stdin and stdout for `initialize`, `tools/list` and each tool call, including bad level ids and bad programs (an error result, never a crash). _R14.8_
 
 - [x] 38. **Second Kiro hook.** Add `.kiro/hooks/run-level-tests-on-save.json`. It runs `node --test tests/levels.test.js tests/levels.chapters.test.js tests/gen.test.js tests/gen.property.test.js` when `levels.js` or `gen.js` is saved, using the same format as the existing hook and the matcher `(^|[\\/])(levels|gen)\.js$`. Test: both hook files parse as JSON with the required fields, and the new matcher matches `levels.js` and `gen.js` but not `sim.js`. _R14.9_
+
+## UX redesign (R15), in this order
+
+- [ ] 39. **Status line.** Pure `statusStrip` in `ui.js`. One line under the arena with time, state word and slips so far; the detail readout moves to TELEMETRY. Tests for every state word and the slip count. _R15.2, R15.14_
+- [ ] 40. **Level text matches data.** In `gen.js`, count patches as contiguous stretches from the map, use "winding path" for routes with turns, and give the length from the reference. Make the legend agree (ice, slick floor, or neither). Tests for all 150 seeds against counts computed independently from the map and the reference. _R15.3, R15.4_
+- [ ] 41. **Runnable buggy starters.** Pure `buggyStarter` for levels 1 to 9 and challenges. Tests: every starter parses, runs, fails, and the coach fixes it. _R15.5_
+- [ ] 42. **Left zone.** COMMANDS popover in place of the accordion, and "Export code" as a secondary button enabled whenever the program parses. Tests: helper for enabled state; page structure. _R15.6_
+- [ ] 43. **Center header bar.** Level selector plus seed controls in one bar, then title, objective, hint, arena and the status line. _R15.7_
+- [ ] 44. **Right tabs.** DIAGNOSIS and TELEMETRY with `tabForState`, auto-switch, and the first-run three lines. Tests for the helper. _R15.8_
+- [ ] 45. **Guide line, jump-to labels, fit at 1366x768.** `guideText` with tests, relabelled jump-to buttons with tooltips, and a layout that fits without page scroll. Browser check: no page scroll and everything key visible at 1366x768. _R15.9 to R15.11_
+- [ ] 46. **Clickable causes.** Trail points get time, plus a pure `positionAt` with unit tests, a marker ring with a time label, and the inline slip bar. Browser check. _R15.12_
+- [ ] 47. **Suggested-path ghost.** Re-simulate the fix with the recorder, draw it dashed, add a legend entry, and clear it on apply, undo, reset or level change. Browser check. _R15.13_
+- [ ] 48. **Visual audit (ux2).** All states at 1366x768 and 1920x1080, at 100, 125 and 150 percent; fix what is found; screenshots in `docs/screenshots/ux2/`. _R15.1, R15.11, R15.14_
+- [ ] 49. **MCP through Kiro and hook notes.** Call the three tools through Kiro and append the raw results to `docs/mcp-proof.md`; reword the hook notes. _R14.8_
+- [ ] 50. **Docs.** README and write-up notes. _R15_

@@ -164,3 +164,22 @@ The coach is a search: it tries small changes to the numbers in the student's pr
 14.7 The system shall show quick-jump buttons for Basics, Grip and Power, Bumpers, Challenge 75 and Challenge 150.
 14.8 A developer tool `tools/sim-mcp/` (not part of the shipped app) shall provide an MCP server with the tools `list_levels`, `run_program(level_id, program)` and `suggest_fix(level_id, program)`, and a README explaining how to register it in Kiro.
 14.9 A second Kiro hook shall run the level and generator tests when `levels.js` or `gen.js` is saved.
+
+## R15. UX redesign: three zones, one status line, tabs
+
+Flow on screen: Write, Run, Diagnose, Fix.
+
+15.1 The first screen shall show only the program editor with RUN, the arena, one status line, and a right panel with one tab visible. Everything else (command list, export, hardware notes, hint) shall be one click away.
+15.2 While a run is going, the line under the arena shall be one line with the simulated time, one state word (RUNNING, SLIPPING, STALLED, GOAL, OUT OF BATTERY, TIMEOUT) and "slips so far: N", where N counts slip events recorded so far in this run.
+15.3 Level text shall match the level's own data. For generated levels the title, objective and hint shall state the number of turns, the number of icy (or slick) patches and the total path length, all computed from the map and the reference program. A path with turns is called a "winding path", not a corridor. An "icy patch" (or "slick patch") is one contiguous stretch of icy (slick) floor cells along the path.
+15.4 The arena legend shall name the floor that the current level actually has: "ice" for ice friction, "slick floor" for slick friction, and neither when the level has none.
+15.5 Every level shall load with a runnable starter program: the objective as comments, a first comment line "starter: has a small bug", and the reference program with the number of its last command reduced. The starter shall parse, run, fail, and be fixable by the coach.
+15.6 Left zone: editor, RUN, RESET, speed buttons, a COMMANDS button that opens a small popover with every command and a one-line example, and an "Export code" secondary button under the editor that is enabled whenever the program parses, also during a run.
+15.7 Center zone: one header bar with the level selector and, in Challenge mode, the seed field with PREV and NEXT; below it the title, objective and a collapsible hint; then the arena; then the single status line.
+15.8 Right zone: two tabs, DIAGNOSIS and TELEMETRY. TELEMETRY is shown while running and after a pass; DIAGNOSIS is selected automatically when a run fails. Before the first run DIAGNOSIS shows "1 Write a program. 2 Press RUN. 3 If it fails, read the diagnosis."
+15.9 One guide line above the editor shall follow the state: before a run "Write a program, then press RUN"; while running "Running..."; after a failure "It failed. See DIAGNOSIS, or try SUGGEST A FIX"; after a pass "Passed. Try the next level or export the code".
+15.10 The jump-to buttons shall read "Basics 1-3", "Grip and Power 4-6", "Bumpers 7-9", "Challenge 75" and "Challenge 150", each with a tooltip saying what it loads.
+15.11 At 1366x768 the editor, RUN, the arena, the status line and the current tab shall be usable without scrolling the page; the right panel may scroll inside itself.
+15.12 Each cause in DIAGNOSIS shall be clickable. Clicking marks the robot's recorded position at that cause's time on the arena with a ring and a time label. A slip cause also shows an inline bar "asked for X N, grip limit Y N" with the real event numbers.
+15.13 Before APPLY FIX, a suggested fix shall be drawn on the arena as a dashed "suggested path" (the suggested program re-simulated with trail recording), with a legend entry. APPLY FIX and UNDO behave as before.
+15.14 No two pieces of on-screen text shall contradict each other (for example "slip no" next to a slip cause).
